@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import pckg from "../package.json" with { type: "json" };
 
-async function writeManifest() {
+export async function writeManifest() {
   const manifest = {
     "manifest_version": 3,
     "name": pckg.name,
@@ -22,5 +22,3 @@ async function writeManifest() {
 
   fs.writeFileSync("./dist/manifest.json", JSON.stringify(manifest, null, 2));
 }
-
-writeManifest();

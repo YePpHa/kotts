@@ -1,13 +1,25 @@
-import esbuild from "esbuild";
-import postcss from "./plugins/postcss.js";
+import { buildScripts } from "./buildScripts.js";
+import { writeManifest } from "./writeManifest.js";
+import fs from "node:fs/promises";
 
-esbuild.build({
-  entryPoints: ["src/main.ts"],
-  bundle: true,
-  platform: "browser",
-  target: "chrome88",
-  outfile: "dist/content_script.js",
-  sourcemap: false,
-  plugins: [postcss]
-});
-  
+const isWatch = process.argv.includes("--watch");
+
+(async () => {
+  buildScripts();
+  await writeManifest();
+
+  if (isWatch) {
+    console.log("Watching for changes...");
+    const changes = fs.watch("./src", { recursive: true });
+    for await (const event of changes) {
+      console.log("Changes detected, rebuilding...");
+      try {
+        await buildScripts();
+        await writeManifest();
+      } catch (err) {
+        console.error(err);
+      }
+      console.log("Watching for changes...");
+    }
+  }
+})();

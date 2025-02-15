@@ -1,3 +1,4 @@
+import { EventEmitter } from "../libs/EventEmitter";
 import { PlaybackState } from "../libs/Media";
 import { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
@@ -6,6 +7,19 @@ import { AudioService } from "./AudioService";
 import { HighligherService } from "./HighlighterService";
 
 export class TTSService {
+  public readonly onStateChange = new EventEmitter<
+    (state: PlaybackState) => void
+  >();
+  public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
+  public readonly onDurationChange = new EventEmitter<
+    (duration: number) => void
+  >();
+  public readonly onAutoScrollingChange = new EventEmitter<
+    (enabled: boolean) => void
+  >();
+
+  private _abortController = new AbortController();
+
   private _audioService: AudioService;
   private _textExtractor: ITextExtractor;
   private _segments: TextSegment[];
@@ -13,6 +27,7 @@ export class TTSService {
   private _lastHighlightedWord: {
     streamIndex: number;
     textRange: IRange;
+    startTime: number;
   } | null = null;
 
   private _playing = false;
@@ -27,10 +42,63 @@ export class TTSService {
 
     this._audioService = new AudioService(ttsApiService, texts);
     this._audioService.onStateChange.add((state) => this._onStateChange(state));
+    this._audioService.onTimeUpdate.add((time) => this.onTimeUpdate.emit(time));
+    this._audioService.onDurationChange.add((duration) =>
+      this.onDurationChange.emit(duration)
+    );
+
+    window.addEventListener("wheel", () => {
+      this._highlighter.setAutoScrolling(false);
+
+      this.onAutoScrollingChange.emit(false);
+    }, {
+      signal: this._abortController.signal,
+    });
   }
 
   public [Symbol.dispose]() {
     this._audioService[Symbol.dispose]();
+    this._abortController.abort();
+  }
+
+  public play(): void {
+    this._audioService.play();
+  }
+
+  public pause(): void {
+    this._audioService.pause();
+    
+    if (this._lastHighlightedWord !== null) {
+      this._audioService.currentTime = this._lastHighlightedWord.startTime;
+    }
+  }
+
+  public isPlaying(): boolean {
+    return this._playing;
+  }
+
+  public setAutoScrolling(enabled: boolean): void {
+    this._highlighter.setAutoScrolling(enabled);
+
+    const currentHighlight = document.querySelector(".kokotts-highlight");
+    currentHighlight?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+
+    this.onAutoScrollingChange.emit(enabled);
+  }
+
+  public isAutoScrolling(): boolean {
+    return this._highlighter.isAutoScrolling();
+  }
+
+  public get currentTime(): number {
+    return this._audioService.currentTime;
+  }
+
+  public get duration(): number {
+    return this._audioService.duration;
   }
 
   private _onStateChange(state: PlaybackState): void {
@@ -42,6 +110,8 @@ export class TTSService {
     if (this._playing) {
       this._highlightLoop();
     }
+
+    this.onStateChange.emit(state);
   }
 
   private _highlightLoop(): void {
@@ -78,7 +148,7 @@ export class TTSService {
 
     this._lastHighlightedWord = word;
 
-    const prevElement = document.querySelector(".readaloud-highlight");
+    const prevElement = document.querySelector(".kokotts-highlight");
     const rect = prevElement?.getBoundingClientRect();
 
     this._highlighter.clear();
@@ -132,7 +202,7 @@ export class TTSService {
 
   private _getWordAtTime(
     time: number,
-  ): { streamIndex: number; textRange: IRange } | null {
+  ): { streamIndex: number; textRange: IRange, startTime: number } | null {
     const chapters = this._audioService.getStreamChapters();
     const ttsResponses = this._audioService.getTtsResponses();
     const chapterIndex = this._getChapterIndexAtTime(time);
@@ -159,6 +229,7 @@ export class TTSService {
         return {
           streamIndex: chapterIndex,
           textRange: wordTimestamp.textRange,
+          startTime: chapter.timeRange.start + wordTimestamp.timeRange.start,
         };
       }
     }
@@ -175,13 +246,5 @@ export class TTSService {
       }
     }
     return -1;
-  }
-
-  public play(): void {
-    this._audioService.play();
-  }
-
-  public pause(): void {
-    this._audioService.pause();
   }
 }

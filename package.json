@@ -5,9 +5,7 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "pnpm run build:script && pnpm run build:manifest",
-    "build:script": "node tools/build.js",
-    "build:manifest": "node tools/writeManifest.js"
+    "build": "node tools/build.js"
   },
   "keywords": [],
   "author": "",
@@ -18,7 +16,10 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "@preact/signals": "^2.0.1",
     "@tailwindcss/postcss": "^4.0.6",
+    "date-fns": "^4.1.0",
+    "lucide-preact": "^0.475.0",
     "postcss": "^8.5.2",
     "postcss-load-config": "^6.0.1",
     "preact": "^10.25.4",

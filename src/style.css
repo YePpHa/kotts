@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
-.readaloud-highlight {
+.kokotts-highlight {
   position: relative;
   z-index: 0;
   --border-size: 0.2em;
 }
 
-.readaloud-highlight::after {
+.kokotts-highlight::after {
   content: " ";
   display: inline-block;
   z-index: -1;
@@ -19,6 +19,12 @@
   transition: left 0.1s ease, width 0.1s ease;
 }
 
-.readaloud-highlight.readaloud-highlight--animate::after {
+.kokotts-highlight.kokotts-highlight--animate::after {
   transition: none;
+}
+
+.kokotts-ui {
+  position: absolute;
+  left: 0;
+  top: 0;
 }

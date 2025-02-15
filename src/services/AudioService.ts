@@ -5,6 +5,7 @@ import type { ITTSApiService, TTSResponse } from "../types/ITTSApiService";
 
 export class AudioService {
   public readonly onTimeUpdate = new EventEmitter<(currentTime: number) => void>();
+  public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
   public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
 
   private _audioStream: AudioStream;
@@ -22,6 +23,7 @@ export class AudioService {
     });
     this._audioStream.onTimeUpdate.add((currentTime) => this.onTimeUpdate.emit(currentTime));
     this._audioStream.onStateChange.add((state) => this.onStateChange.emit(state));
+    this._audioStream.onDurationChange.add((duration) => this.onDurationChange.emit(duration));
   }
 
   public [Symbol.dispose]() {
@@ -31,6 +33,14 @@ export class AudioService {
 
   public get currentTime(): number {
     return this._audioStream.currentTime;
+  }
+
+  public set currentTime(value: number) {
+    this._audioStream.currentTime = value;
+  }
+
+  public get duration(): number {
+    return this._audioStream.duration;
   }
 
   public play(): void {

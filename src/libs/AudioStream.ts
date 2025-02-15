@@ -87,6 +87,9 @@ export class AudioStream {
       reader.releaseLock();
 
       const end = this._mediaSourceAppender.duration;
+      if (start !== end) {
+        this.onDurationChange.emit(this.duration);
+      }
 
       this._streamChapters.push({
         timeRange: {

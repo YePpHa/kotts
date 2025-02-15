@@ -1,7 +1,7 @@
-import rawStyles from "./style.css" with { type: "css" };
+import content from "./style.css" with { type: "css" };
 
 export function injectStyle() {
   const style = document.createElement("style");
-  style.innerHTML = rawStyles;
+  style.innerHTML = content;
   document.head.appendChild(style);
 }

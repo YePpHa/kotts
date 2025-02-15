@@ -1,6 +1,16 @@
 export class HighligherService {
   private _restoreMap = new Map<Node, Node[]>();
 
+  private _autoScrolling = true;
+
+  public setAutoScrolling(enabled: boolean) {
+    this._autoScrolling = enabled;
+  }
+
+  public isAutoScrolling(): boolean {
+    return this._autoScrolling;
+  }
+
   private _getSplitRange(range: Range): Range[] {
     const originalTextNode = range.startContainer;
 
@@ -60,7 +70,7 @@ export class HighligherService {
 
       const highlightTextNode = parts[1];
       const wrapperNode = document.createElement("span");
-      wrapperNode.classList.add("readaloud-highlight");
+      wrapperNode.classList.add("kokotts-highlight");
       wrapperNode.appendChild(highlightTextNode);
       parts[1] = wrapperNode;
 
@@ -72,19 +82,21 @@ export class HighligherService {
           const diff = prevRect.left - rect.left;
           wrapperNode.style.setProperty("--animate-from-left", `${diff}px`);
           wrapperNode.style.setProperty("--animate-from-width", `${prevRect.width}px`);
-          wrapperNode.classList.add("readaloud-highlight--animate");
+          wrapperNode.classList.add("kokotts-highlight--animate");
           window.requestAnimationFrame(() => {
             wrapperNode.style.removeProperty("--animate-from-left");
             wrapperNode.style.removeProperty("--animate-from-width");
-            wrapperNode.classList.remove("readaloud-highlight--animate");
+            wrapperNode.classList.remove("kokotts-highlight--animate");
           });
         }
       }
 
-      wrapperNode.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
+      if (this._autoScrolling) {
+        wrapperNode.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
     }
   }
 
