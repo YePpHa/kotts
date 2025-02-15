@@ -1,7 +1,6 @@
 import postcss from "postcss";
 import postcssrc from "postcss-load-config";
 import fs from "node:fs/promises";
-import config from "../../postcss.config.mjs";
 
 export default {
   name: "postcss",
@@ -23,8 +22,8 @@ export default {
       const result = await postcss(plugins).process(css, options);
 
       return {
-        contents: JSON.stringify(result.css),
-        loader: "css",
+        contents: result.css,
+        loader: "text",
       };
     });
   },
