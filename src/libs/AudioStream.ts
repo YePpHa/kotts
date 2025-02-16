@@ -1,6 +1,6 @@
 import type { IRange } from "../types/IRange";
 import { EventEmitter } from "./EventEmitter";
-import { type BufferingState, Media, PlaybackState } from "./Media";
+import { type BufferingState, MediaController, PlaybackState } from "./MediaController";
 import { MediaSourceAppender } from "./MediaSourceAppender";
 
 export type AudioStreamOptions = {
@@ -26,8 +26,8 @@ export class AudioStream {
   public readonly onError = new EventEmitter<(error: unknown) => void>();
 
   private _abortController = new AbortController();
-  private _audio = new Media(new Audio());
-  private _mediaSourceAppender = new MediaSourceAppender(this._audio);
+  private _audioController = new MediaController(new Audio());
+  private _mediaSourceAppender = new MediaSourceAppender(this._audioController);
 
   private _streams: AsyncIterable<StreamData, void, void>;
   private _streamChapters: StreamChapter[] = [];
@@ -37,17 +37,17 @@ export class AudioStream {
   constructor(streams: AsyncIterable<StreamData, void, void>, options: Partial<AudioStreamOptions> = {}) {
     const playbackState = options.autoPlay ? PlaybackState.Play : PlaybackState.Pause;
 
-    this._audio.onStateChange.add(state => this.onStateChange.emit(state));
-    this._audio.onBufferingStateChange.add(state => this.onBufferingStateChange.emit(state));
-    this._audio.onTimeUpdate.add((currentTime) => this.onTimeUpdate.emit(currentTime));
-    this._audio.onDurationChange.add(duration => this.onDurationChange.emit(duration));
+    this._audioController.onStateChange.add(state => this.onStateChange.emit(state));
+    this._audioController.onBufferingStateChange.add(state => this.onBufferingStateChange.emit(state));
+    this._audioController.onTimeUpdate.add((currentTime) => this.onTimeUpdate.emit(currentTime));
+    this._audioController.onDurationChange.add(duration => this.onDurationChange.emit(duration));
 
-    this._audio.setPlaybackState(playbackState);
+    this._audioController.setPlaybackState(playbackState);
 
     this._streams = streams;
 
-    this._audio.media.addEventListener("error", evt => {
-      const error = this._audio.media.error;
+    this._audioController.media.addEventListener("error", evt => {
+      const error = this._audioController.media.error;
       if (error) {
         this.onError.emit(error);
       }
@@ -108,7 +108,7 @@ export class AudioStream {
   public [Symbol.dispose]() {
     this._abortController.abort();
 
-    this._audio[Symbol.dispose]();
+    this._audioController[Symbol.dispose]();
     this._mediaSourceAppender[Symbol.dispose]();
   }
 
@@ -121,15 +121,15 @@ export class AudioStream {
   }
 
   public get state(): PlaybackState {
-    return this._audio.getPlaybackState();
+    return this._audioController.getPlaybackState();
   }
 
   public set state(value: PlaybackState) {
-    this._audio.setPlaybackState(value);
+    this._audioController.setPlaybackState(value);
   }
 
   public get isBuffering(): boolean {
-    return this._audio.isBuffering();
+    return this._audioController.isBuffering();
   }
 
   public get duration(): number {
@@ -137,26 +137,26 @@ export class AudioStream {
   }
 
   public get currentTime(): number {
-    return this._audio.currentTime;
+    return this._audioController.currentTime;
   }
 
   public set currentTime(value: number) {
-    this._audio.currentTime = value;
+    this._audioController.currentTime = value;
   }
 
   public get volume(): number {
-    return this._audio.volume;
+    return this._audioController.volume;
   }
 
   public set volume(value: number) {
-    this._audio.volume = value;
+    this._audioController.volume = value;
   }
 
   public play(): void {
-    this._audio.play();
+    this._audioController.play();
   }
 
   public pause(): void {
-    this._audio.pause();
+    this._audioController.pause();
   }
 }

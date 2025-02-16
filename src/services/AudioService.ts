@@ -1,6 +1,6 @@
 import { AudioStream, StreamChapter, type StreamData } from "../libs/AudioStream";
 import { EventEmitter } from "../libs/EventEmitter";
-import { PlaybackState } from "../libs/Media";
+import { PlaybackState } from "../libs/MediaController";
 import type { ITTSApiService, TTSResponse } from "../types/ITTSApiService";
 
 export class AudioService {

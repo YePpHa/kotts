@@ -11,7 +11,7 @@ export enum BufferingState {
   Ready = "ready"
 }
 
-export class Media<T extends HTMLMediaElement> {
+export class MediaController<T extends HTMLMediaElement> {
   public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
   public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();

@@ -1,5 +1,5 @@
 import { EventEmitter } from "../libs/EventEmitter";
-import { PlaybackState } from "../libs/Media";
+import { PlaybackState } from "../libs/MediaController";
 import { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
 import type { ITTSApiService } from "../types/ITTSApiService";

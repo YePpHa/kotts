@@ -1,5 +1,5 @@
 import { RoyalRoadTextExtractor } from "./extractors/RoyalRoadTextExtractor";
-import { PlaybackState } from "./libs/Media";
+import { PlaybackState } from "./libs/MediaController";
 import { KokoroTTSApiService } from "./services/KokoroTTSApiService";
 import { TTSService } from "./services/TTSService";
 import { injectStyle } from "./style";
