@@ -342,10 +342,6 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
     });
   }
 
-  /**
-   * Example method to decode audio and find the actual duration of the chunk.
-   * If your chunks are partial or from a video container, you'll need more complex logic.
-   */
   private async _estimateChunkDuration(chunk: Uint8Array): Promise<number> {
     try {
       // Force a copy of the chunk data into a brand-new ArrayBuffer.
