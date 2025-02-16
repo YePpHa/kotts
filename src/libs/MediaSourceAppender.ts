@@ -17,18 +17,26 @@ interface StoredSegment {
   duration: number; // Duration of this chunk
 }
 
-interface Operation {
-  segment: StoredSegment;
-  resolve: () => void;
-  reject: (error: unknown) => void;
-}
+/** Represents either an offset change or a buffer append operation. */
+type Operation =
+  | {
+    type: "offset";
+    offset: number;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  }
+  | {
+    type: "append";
+    data: Uint8Array;
+    resolve: () => void;
+    reject: (error: unknown) => void;
+  };
 
 export class MediaSourceAppender<T extends HTMLMediaElement> {
   public readonly onError = new EventEmitter<(error: unknown) => void>();
 
   // Keep a list of segments that have arrived but not yet appended
   private _segments: StoredSegment[] = [];
-  // Index of the next segment to flush
   private _nextSegmentIndex = 0;
 
   private _mediaController: MediaController<T>;
@@ -38,7 +46,7 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
 
   private _abortController = new AbortController();
 
-  // A queue of actual "append" operations to the SourceBuffer.
+  // A queue of offset/append operations to the SourceBuffer
   private _pendingOperations: Operation[] = [];
 
   // How many seconds of past data to keep in the buffer behind currentTime
@@ -53,11 +61,11 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
    */
   private _currentTimestamp = 0;
 
-  // If you want to decode audio for duration estimates, create an (Offline)AudioContext.
-  // This is just an example; in real code you may want dynamic sample rates.
-  private static _offlineAudioCtx = new window.OfflineAudioContext(
+  // Example offline AudioContext for decoding. Replace or remove if not needed.
+  private static _offlineAudioCtx = new (window.OfflineAudioContext ||
+    (window as any).webkitOfflineAudioContext)(
     2, // # of channels
-    44100, // length (in sample-frames)
+    44100, // length in sample-frames
     44100, // sampleRate
   );
 
@@ -65,6 +73,7 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
     this._mediaController = mediaController;
     this._mediaSource = new MediaSource();
 
+    // We'll fulfill this promise when 'sourceopen' fires
     this._mediaSourceOpen = new Promise<void>((resolve) => {
       this._mediaSource.addEventListener("sourceopen", () => resolve(), {
         signal: this._abortController.signal,
@@ -72,10 +81,10 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
       });
     });
 
-    // Assign the MediaSource to the <video>/<audio> src
+    // Assign the MediaSource to the <video>/<audio> element
     this._mediaController.media.src = URL.createObjectURL(this._mediaSource);
 
-    // Listen to MediaController events so we know when to flush, trim, etc.
+    // Listen to MediaController events so we can flush or trim buffers
     this._mediaController.onStateChange.add(this._handleStateChange.bind(this));
     this._mediaController.onBufferingStateChange.add((state) => this._handleBufferingStateChange(state));
     this._mediaController.onTimeUpdate.add(this._handleTimeUpdate.bind(this));
@@ -86,10 +95,10 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
    * Because we might decode the audio to measure duration, this is async.
    */
   public async next(mimeType: string, chunk: Uint8Array): Promise<void> {
-    // 1) Estimate the duration of this chunk (asynchronously)
+    // 1) Estimate the duration
     const chunkDuration = await this._estimateChunkDuration(chunk);
 
-    // 2) Create a segment entry with the next available timestamp
+    // 2) Create a segment with an assigned timestamp
     const segment: StoredSegment = {
       data: chunk,
       mimeType,
@@ -97,10 +106,10 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
       duration: chunkDuration,
     };
 
-    // 3) Push it into our list of not-yet-appended segments
+    // 3) Store segment
     this._segments.push(segment);
 
-    // 4) Advance our timeline
+    // 4) Advance timeline
     this._currentTimestamp += chunkDuration;
   }
 
@@ -112,7 +121,7 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
   }
 
   /**
-   * Release resources if needed (dispose pattern).
+   * Dispose pattern, if needed.
    */
   public [Symbol.dispose]() {
     this._abortController.abort();
@@ -133,27 +142,19 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
     return lastSegment.timestamp + lastSegment.duration;
   }
 
-  /**
-   * Handle changes in PlaybackState (Play, Pause, Ended, etc.)
-   * so we can decide whether to flush more data, etc.
-   */
+  /** Handle play/pause/ended events */
   private _handleStateChange(state: PlaybackState) {
-    try {
-      switch (state) {
-        case PlaybackState.Play:
-          // Attempt to flush any stored segments if user presses play
-          this._flushSegments();
-          break;
-        case PlaybackState.Pause:
-          // Possibly suspend segment flushing if paused (optional)
-          break;
-        case PlaybackState.Ended:
-          // Possibly do final cleanup, if needed
-          break;
-      }
-    } catch (err) {
-      console.error(err);
-      this.onError.emit(err);
+    switch (state) {
+      case PlaybackState.Play:
+        // Attempt to flush any stored segments if user presses play
+        this._flushSegments();
+        break;
+      case PlaybackState.Pause:
+        // Possibly suspend segment flushing if paused
+        break;
+      case PlaybackState.Ended:
+        // Possibly do final cleanup, if needed
+        break;
     }
   }
 
@@ -173,121 +174,83 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
     }
   }
 
-  /**
-   * Called whenever the media's currentTime changes (timeupdate).
-   * We can trim the buffer behind currentTime to maintain a sliding window.
-   */
+  /** Called on each timeupdate event to maintain a sliding window etc. */
   private _handleTimeUpdate(time: number) {
-    try {
-      // Remove data behind currentTime
-      this._trimBuffer(false);
-      // Optionally, flush new segments if playing
-      if (this._mediaController.getPlaybackState() === PlaybackState.Play) {
-        this._flushSegments();
-      }
-    } catch (err) {
-      console.error(err);
-      this.onError.emit(err);
+    // Clean older data
+    this._trimBuffer(false);
+    // Optionally flush new segments
+    if (this._mediaController.getPlaybackState() === PlaybackState.Play) {
+      this._flushSegments();
     }
   }
 
   /**
-   * Append all segments that haven't been appended yet.
-   * We set the .timestampOffset before each append so
-   * each segment is placed at the correct timeline position.
+   * For each un-flushed segment, queue up an offset operation and then an append operation.
    */
   private async _flushSegments(): Promise<void> {
     await this._mediaSourceOpen;
 
-    // If we have no SourceBuffer yet, create one based on the first segment
-    // This assumes all segments have the same MIME type.
-    // If you have multiple types, you'll need multiple SourceBuffers.
+    // If we have no SourceBuffer yet, create one from the first segment
     if (!this._sourceBuffer && this._segments.length > 0) {
       const firstSegment = this._segments[0];
       this._sourceBuffer = this._mediaSource.addSourceBuffer(
         firstSegment.mimeType,
       );
-      this._sourceBuffer.mode = "segments";
+      this._sourceBuffer.mode = "sequence";
 
+      // We'll call _processNextOperation after each updateend
       this._sourceBuffer.addEventListener("updateend", () => {
         this._processNextOperation();
       }, { signal: this._abortController.signal });
     }
 
-    // If there's an error on the media element, bail out
+    // If there's an error on the media element, bail
     if (this._mediaController.error) {
       return;
     }
 
-    // Append segments in order until all are appended or we run into an error
+    // Add offset+append ops for all remaining segments
     while (this._nextSegmentIndex < this._segments.length) {
-      // Safety check: if we're updating or no SourceBuffer, break out
-      if (!this._sourceBuffer || this._sourceBuffer.updating) {
-        break;
-      }
-
       const segment = this._segments[this._nextSegmentIndex];
 
-      try {
-        // Actually append segment data
-        await this._appendChunk(segment);
+      // 1) Queue an operation to set the timestampOffset
+      this._pendingOperations.push({
+        type: "offset",
+        offset: segment.timestamp,
+        resolve: () => {},
+        reject: () => {},
+      });
 
-        // Mark it done
-        this._nextSegmentIndex++;
+      // 2) Queue an operation to append the data
+      this._pendingOperations.push({
+        type: "append",
+        data: segment.data,
+        resolve: () => {},
+        reject: () => {},
+      });
 
-        // Maintain a sliding window behind currentTime
-        await this._trimBuffer(false);
-      } catch (err) {
-        if (err instanceof Error && err.name === "QuotaExceededError") {
-          // On QuotaExceededError, remove more behind the live point
-          console.warn("Quota exceeded. Doing an aggressive trim...");
-          await this._trimBuffer(true);
-          // Retry appending same segment after trimming
-          continue;
-        } else {
-          // Some other error
-          console.error("Error appending segment:", err);
-          this.onError.emit(err);
-          break;
-        }
-      }
+      this._nextSegmentIndex++;
+    }
+
+    // Kick off the queue
+    if (this._sourceBuffer && !this._sourceBuffer.updating) {
+      this._processNextOperation();
     }
   }
 
   /**
-   * Actually queue an append operation for the given StoredSegment.
-   */
-  private async _appendChunk(segment: StoredSegment): Promise<void> {
-    if (this._mediaController.error) {
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      if (!this._sourceBuffer) {
-        return reject(new Error("SourceBuffer is null"));
-      }
-
-      const operation = { segment, resolve, reject };
-      this._pendingOperations.push(operation);
-
-      // If the SourceBuffer is not busy, process immediately
-      if (!this._sourceBuffer.updating) {
-        this._processNextOperation();
-      }
-    });
-  }
-
-  /**
-   * Called after "updateend" to append the next queued segment operation.
+   * Walks through the queue of operations (offset or append) and executes them in order,
+   * waiting for the SourceBuffer to finish updating between operations.
    */
   private _processNextOperation() {
+    // If we have no buffer or it's busy, do nothing yet
     if (!this._sourceBuffer || this._sourceBuffer.updating) {
       return;
     }
-    if (this._pendingOperations.length === 0) {
+    if (this._mediaController.error) {
       return;
     }
-    if (this._mediaController.error) {
+    if (this._pendingOperations.length === 0) {
       return;
     }
 
@@ -296,44 +259,54 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
       return;
     }
 
-    try {
-      this._sourceBuffer.timestampOffset = operation.segment.timestamp;
-      this._sourceBuffer.appendBuffer(operation.segment.data);
-      operation.resolve();
-    } catch (error) {
-      operation.reject(error);
-      // If not an InvalidStateError, keep processing the queue
-      if (error instanceof Error && error.name !== "InvalidStateError") {
+    // Perform the operation
+    if (operation.type === "offset") {
+      try {
+        // We can only set the offset if the buffer is NOT parsing a segment
+        // (which we verified above, because .updating === false).
+        this._sourceBuffer.timestampOffset = operation.offset;
+        operation.resolve();
+        // Move on to the next op
         this._processNextOperation();
+      } catch (error) {
+        operation.reject(error);
+        this.onError.emit(error);
+      }
+    } else if (operation.type === "append") {
+      try {
+        this._sourceBuffer.appendBuffer(operation.data);
+        // The actual completion (resolve) happens once 'updateend' fires
+        // so we do that in the event listener (which calls _processNextOperation).
+        operation.resolve();
+      } catch (error) {
+        operation.reject(error);
+        if (error instanceof Error && error.name !== "InvalidStateError") {
+          // Keep processing so the queue isn't stuck
+          this._processNextOperation();
+        }
+        this.onError.emit(error);
       }
     }
   }
 
-  /**
-   * Remove data behind the currentTime to maintain a sliding window,
-   * or remove more aggressively if we hit QuotaExceededError.
-   */
+  /** Remove data behind the currentTime to maintain a sliding window */
   private async _trimBuffer(aggressive = false): Promise<void> {
     if (!this._sourceBuffer || this._sourceBuffer.buffered.length === 0) {
       return;
     }
     const currentTime = this._mediaController.currentTime;
 
-    // Decide how far behind currentTime to remove
     const start = this._sourceBuffer.buffered.start(0);
     const cutoff = aggressive
       ? currentTime - this.SLIDING_WINDOW_DURATION / 2
       : currentTime - this.SLIDING_WINDOW_DURATION;
 
-    // Only remove if there's buffer behind "cutoff"
     if (cutoff > start) {
       await this._removeBufferRange(start, cutoff);
     }
   }
 
-  /**
-   * Utility for removing a time range from the SourceBuffer.
-   */
+  /** Utility to remove a time range from the SourceBuffer safely */
   private async _removeBufferRange(start: number, end: number): Promise<void> {
     if (!this._sourceBuffer || end <= start) {
       return;
@@ -370,28 +343,22 @@ export class MediaSourceAppender<T extends HTMLMediaElement> {
   }
 
   /**
-   * Example: decoding audio to find the actual duration of the chunk.
-   * This requires that each chunk is independently decodable!
-   * If your chunks are partial, you may need to buffer them until you have a full container.
-   *
-   * This approach uses an OfflineAudioContext to decode. The chunk must be a complete audio frame.
+   * Example method to decode audio and find the actual duration of the chunk.
+   * If your chunks are partial or from a video container, you'll need more complex logic.
    */
   private async _estimateChunkDuration(chunk: Uint8Array): Promise<number> {
     try {
       // Force a copy of the chunk data into a brand-new ArrayBuffer.
-      // This ensures we get an ArrayBuffer (not a SharedArrayBuffer).
       const arrayBuffer = new ArrayBuffer(chunk.byteLength);
       new Uint8Array(arrayBuffer).set(chunk);
 
-      // Attempt to decode.
+      // Attempt to decode in an OfflineAudioContext
       const audioBuffer = await MediaSourceAppender._offlineAudioCtx
         .decodeAudioData(arrayBuffer);
-      // The decode gives us an AudioBuffer with .duration in seconds.
-      return audioBuffer.duration;
+      return audioBuffer.duration; // in seconds
     } catch (err) {
       console.error("Unable to decode audio chunk.", err);
-      // If we fail to decode, return a fallback. Could be 0 or guess.
-      return 0;
+      return 0; // fallback
     }
   }
 }
