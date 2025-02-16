@@ -1,12 +1,15 @@
 import { AudioStream, StreamChapter, type StreamData } from "../libs/AudioStream";
 import { EventEmitter } from "../libs/EventEmitter";
-import { PlaybackState } from "../libs/MediaController";
+import { BufferingState, PlaybackState } from "../libs/MediaController";
 import type { ITTSApiService, TTSResponse } from "../types/ITTSApiService";
 
 export class AudioService {
   public readonly onTimeUpdate = new EventEmitter<(currentTime: number) => void>();
   public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
   public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
+  public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
+  public readonly onStreamUpdate = new EventEmitter<() => void>();
+  public readonly onStreamFinished = new EventEmitter<() => void>();
 
   private _audioStream: AudioStream;
 
@@ -24,12 +27,19 @@ export class AudioService {
     this._audioStream.onError.add((error) => console.error(error));
     this._audioStream.onTimeUpdate.add((currentTime) => this.onTimeUpdate.emit(currentTime));
     this._audioStream.onStateChange.add((state) => this.onStateChange.emit(state));
+    this._audioStream.onBufferingStateChange.add((state) => this.onBufferingStateChange.emit(state));
     this._audioStream.onDurationChange.add((duration) => this.onDurationChange.emit(duration));
+    this._audioStream.onStreamUpdate.add(() => this.onStreamUpdate.emit());
+    this._audioStream.onStreamFinished.add(() => this.onStreamFinished.emit());
   }
 
   public [Symbol.dispose]() {
     this._audioStream[Symbol.dispose]();
     this._abortController.abort();
+  }
+
+  public get streamFinished(): boolean {
+    return this._audioStream.streamFinished;
   }
 
   public get currentTime(): number {

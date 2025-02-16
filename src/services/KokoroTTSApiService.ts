@@ -83,7 +83,8 @@ export class KokoroTTSApiService implements ITTSApiService {
   private _parseWordTimestamps(text: string, timestamps: z.infer<typeof WordTimestampSchema>[]): WordTimestamp[] {
     const wordTimestamps: WordTimestamp[] = [];
     let offset = 0;
-    for (const timestamp of timestamps) {
+    for (let i = 0; i < timestamps.length; i++) {
+      const timestamp = timestamps[i];
       if (timestamp.word.match(/^\W+$/)) {
         continue;
       }
@@ -92,6 +93,12 @@ export class KokoroTTSApiService implements ITTSApiService {
       if (range === null) {
         continue;
       }
+      if (range.start === text.length && i < timestamps.length - 1) {
+        console.warn("Failed to find range for word", timestamp.word);
+        range.start = offset + timestamp.word.length;
+        range.end = offset + timestamp.word.length;
+      }
+
       wordTimestamps.push({
         timeRange: {
           start: timestamp.start_time,

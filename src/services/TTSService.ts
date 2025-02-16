@@ -1,8 +1,10 @@
 import { EventEmitter } from "../libs/EventEmitter";
-import { PlaybackState } from "../libs/MediaController";
+import { BufferingState, PlaybackState } from "../libs/MediaController";
 import { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
 import type { ITTSApiService } from "../types/ITTSApiService";
+import { getCommonAncestor, isElementNode, isTextNode } from "../utils/Node";
+import { throttle } from "../utils/Timings";
 import { AudioService } from "./AudioService";
 import { HighligherService } from "./HighlighterService";
 
@@ -10,12 +12,18 @@ export class TTSService {
   public readonly onStateChange = new EventEmitter<
     (state: PlaybackState) => void
   >();
+  public readonly onBufferingStateChange = new EventEmitter<
+    (state: BufferingState) => void
+  >();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
   public readonly onDurationChange = new EventEmitter<
     (duration: number) => void
   >();
   public readonly onAutoScrollingChange = new EventEmitter<
     (enabled: boolean) => void
+  >();
+  public readonly onSegmentHighlight = new EventEmitter<
+    (segmentIndex: number, segmentElement: HTMLElement) => void
   >();
 
   private _abortController = new AbortController();
@@ -31,6 +39,10 @@ export class TTSService {
   } | null = null;
 
   private _playing = false;
+  private _buffering = false;
+  private _notLoadedBuffering = false;
+
+  private _playSegmentIndex = -1;
 
   constructor(ttsApiService: ITTSApiService, textExtractor: ITextExtractor) {
     this._textExtractor = textExtractor;
@@ -43,9 +55,18 @@ export class TTSService {
     this._audioService = new AudioService(ttsApiService, texts);
     this._audioService.onStateChange.add((state) => this._onStateChange(state));
     this._audioService.onTimeUpdate.add((time) => this.onTimeUpdate.emit(time));
+    this._audioService.onBufferingStateChange.add((state) => {
+      const isBuffering = this.buffering;
+
+      this._buffering = state === BufferingState.Buffering;
+      if (isBuffering !== this.buffering) {
+        this.onBufferingStateChange.emit(state);
+      }
+    });
     this._audioService.onDurationChange.add((duration) =>
       this.onDurationChange.emit(duration)
     );
+    this._audioService.onStreamUpdate.add(() => this._onStreamUpdate());
 
     window.addEventListener("wheel", () => {
       this._highlighter.setAutoScrolling(false);
@@ -54,11 +75,23 @@ export class TTSService {
     }, {
       signal: this._abortController.signal,
     });
+
+    document.addEventListener(
+      "mousemove",
+      (evt) => this._handleMouseMove(evt),
+      {
+        signal: this._abortController.signal,
+      },
+    );
   }
 
   public [Symbol.dispose]() {
     this._audioService[Symbol.dispose]();
     this._abortController.abort();
+  }
+
+  public get buffering(): boolean {
+    return this._notLoadedBuffering || this._buffering;
   }
 
   public play(): void {
@@ -67,10 +100,68 @@ export class TTSService {
 
   public pause(): void {
     this._audioService.pause();
-    
+
     if (this._lastHighlightedWord !== null) {
       this._audioService.currentTime = this._lastHighlightedWord.startTime;
     }
+  }
+
+  public playSegment(index: number): void {
+    if (index < 0 || index >= this._segments.length) {
+      return;
+    }
+
+    const chapters = this._audioService.getStreamChapters();
+    if (index >= chapters.length) {
+      if (this._audioService.streamFinished) {
+        console.warn("Stream is finished, cannot play segment");
+        return;
+      }
+
+      this.pause();
+
+      this._notLoadedBuffering = true;
+      this.onBufferingStateChange.emit(BufferingState.Buffering);
+      this._playSegmentIndex = index;
+      return;
+    }
+
+    const chapter = chapters[index];
+    this._audioService.currentTime = chapter.timeRange.start;
+    const isBuffering = this.buffering;
+    if (isBuffering) {
+      this._notLoadedBuffering = false;
+      if (!this._buffering) {
+        this.onBufferingStateChange.emit(BufferingState.Ready);
+      }
+    }
+    this.play();
+  }
+
+  private _onStreamUpdate(): void {
+    if (this._playSegmentIndex === -1) {
+      return;
+    }
+    const segmentIndex = this._playSegmentIndex;
+    this._playSegmentIndex = -1;
+
+    const chapters = this._audioService.getStreamChapters();
+    if (segmentIndex >= chapters.length) {
+      this._playSegmentIndex = segmentIndex;
+      return;
+    }
+
+    const chapter = chapters[segmentIndex];
+    this._audioService.currentTime = chapter.timeRange.start;
+    const isBuffering = this.buffering;
+    if (isBuffering) {
+      this._notLoadedBuffering = false;
+      if (!this._buffering) {
+        this.onBufferingStateChange.emit(BufferingState.Ready);
+      }
+    }
+
+    this.play();
   }
 
   public isPlaying(): boolean {
@@ -110,6 +201,8 @@ export class TTSService {
     if (this._playing) {
       this._highlightLoop();
     }
+
+    this._playSegmentIndex = -1;
 
     this.onStateChange.emit(state);
   }
@@ -206,7 +299,7 @@ export class TTSService {
 
   private _getWordAtTime(
     time: number,
-  ): { streamIndex: number; textRange: IRange, startTime: number } | null {
+  ): { streamIndex: number; textRange: IRange; startTime: number } | null {
     const chapters = this._audioService.getStreamChapters();
     const ttsResponses = this._audioService.getTtsResponses();
     const chapterIndex = this._getChapterIndexAtTime(time);
@@ -247,6 +340,45 @@ export class TTSService {
       const chapter = chapters[i];
       if (chapter.timeRange.start <= time && time <= chapter.timeRange.end) {
         return i;
+      }
+    }
+    return -1;
+  }
+
+  private _handleMouseMove = throttle((evt: MouseEvent): void => {
+    const element = evt.target;
+    if (element === null || !(element instanceof Node)) {
+      return;
+    }
+
+    const segmentIndex = this._getSegmentIndexAtElement(element);
+    if (segmentIndex === -1) {
+      return;
+    }
+
+    const { container } = this._segments[segmentIndex];
+    this.onSegmentHighlight.emit(segmentIndex, container);
+  });
+
+  private _getSegmentIndexAtElement(element: Node): number {
+    let focusedIndex = -1;
+    for (let i = 0; i < this._segments.length; i++) {
+      const segment = this._segments[i];
+      const firstContainer = segment.container;
+      if (element.contains(firstContainer)) {
+        if (focusedIndex !== -1) {
+          return -1;
+        }
+
+        focusedIndex = i;
+        if (i === this._segments.length - 1) {
+          return focusedIndex;
+        }
+        continue;
+      }
+
+      if (focusedIndex !== -1) {
+        return focusedIndex;
       }
     }
     return -1;

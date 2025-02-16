@@ -7,6 +7,7 @@ interface SidebarComponentProps {
   onPlayPauseClick?: () => void;
   onEnableAutoScrollingClick?: () => void;
   isPlaying: boolean;
+  buffering: boolean;
   currentTime: number;
   duration: number;
   autoScrolling: boolean;
@@ -19,6 +20,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
       onPlayPauseClick,
       onEnableAutoScrollingClick,
       isPlaying,
+      buffering,
       currentTime,
       duration,
       autoScrolling,
@@ -44,6 +46,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
           </span>
           <PlayButtonComponent
             isPlaying={isPlaying}
+            buffering={buffering}
             progress={currentTime / duration}
             size={32}
             strokeWidth={2}

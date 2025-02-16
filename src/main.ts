@@ -1,5 +1,5 @@
 import { RoyalRoadTextExtractor } from "./extractors/RoyalRoadTextExtractor";
-import { PlaybackState } from "./libs/MediaController";
+import { BufferingState, PlaybackState } from "./libs/MediaController";
 import { KokoroTTSApiService } from "./services/KokoroTTSApiService";
 import { TTSService } from "./services/TTSService";
 import { injectStyle } from "./style";
@@ -22,16 +22,21 @@ const ttsService = new TTSService(kokoroApiService, textExtractor);
 
 const {
   setPlaying,
+  setBuffering,
   setCurrentTime,
   setDuration,
   setAutoScrolling,
   setAutoScrollingDirection,
+  setSegmentHover,
 } = setupUi({
   isPlaying: ttsService.isPlaying(),
+  buffering: ttsService.buffering,
   currentTime: ttsService.currentTime,
   duration: ttsService.duration,
   autoScrolling: ttsService.isAutoScrolling(),
   autoScrollingDirection: "up",
+  segmentHoverElement: null,
+  segmentHoverIndex: -1,
   onEnableAutoScrollingClick: () => {
     ttsService.setAutoScrolling(true);
   },
@@ -41,6 +46,10 @@ const {
     } else {
       ttsService.play();
     }
+  },
+  onSegmentHoverPlayClick: (index) => {
+    setSegmentHover(-1, null);
+    ttsService.playSegment(index);
   },
 });
 
@@ -58,4 +67,12 @@ ttsService.onDurationChange.add((duration) => {
 
 ttsService.onAutoScrollingChange.add((enabled) => {
   setAutoScrolling(enabled);
+});
+
+ttsService.onSegmentHighlight.add((index, element) => {
+  setSegmentHover(index, element);
+});
+
+ttsService.onBufferingStateChange.add((state) => {
+  setBuffering(state === BufferingState.Buffering);
 });

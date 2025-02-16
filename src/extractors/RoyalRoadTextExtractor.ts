@@ -1,5 +1,5 @@
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
-import { findNearestNonInlineElement, getCommonAncestor, isTextNode } from "../utils/Node";
+import { findNearestNonInlineElement, getCommonAncestor, isElementNode, isTextNode } from "../utils/Node";
 
 export class RoyalRoadTextExtractor implements ITextExtractor {
   extractText(): TextSegment[] {
@@ -24,35 +24,55 @@ export class RoyalRoadTextExtractor implements ITextExtractor {
     }
 
     // Group text nodes into paragraphs
-    const segments: TextSegment[] = [];
+    const texts: Text[][] = [];
     for (let i = 0; i < textNodes.length; i++) {
       const textNode = textNodes[i];
       if (textNode.parentElement === null || textNode.parentElement.offsetParent === null) {
         continue;
       }
 
-      if (segments.length === 0) {
-        segments.push({
-          texts: [textNode]
-        });
+      if (texts.length === 0) {
+        texts.push([textNode]);
         continue;
       }
 
       const prevNode = textNodes[i - 1];
       if (!this._isTextInSameParagraph(prevNode, textNode)) {
-        segments.push({
-          texts: []
-        });
+        texts.push([]);
       }
-      segments[segments.length - 1].texts.push(textNode);
+      texts[texts.length - 1].push(textNode);
     }
 
     // Remove empty paragraphs
-    for (let i = segments.length - 1; i >= 0; i--) {
-      const text = segments[i].texts.map(text => text.textContent).join("");
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const text = texts[i].map(text => text.textContent).join("");
       if (text.trim().length === 0) {
-        segments.splice(i, 1);
+        texts.splice(i, 1);
       }
+    }
+
+    const segments: TextSegment[] = [];
+    for (const textNodes of texts) {
+      let commonAncestor: Node = textNodes[0];
+      for (let i = 1; i < textNodes.length; i++) {
+        const cm = getCommonAncestor(commonAncestor, textNodes[i]);
+        if (cm === null) {
+          throw new Error("Common ancestor not found");
+        }
+
+        commonAncestor = cm;
+      }
+      if (isTextNode(commonAncestor) && commonAncestor.parentElement !== null) {
+        commonAncestor = commonAncestor.parentElement;
+      }
+      if (!isElementNode(commonAncestor)) {
+        throw new Error("Common ancestor is not an element");
+      }
+      
+      segments.push({
+        texts: textNodes,
+        container: commonAncestor,
+      });
     }
 
     return segments;

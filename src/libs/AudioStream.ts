@@ -21,6 +21,7 @@ export class AudioStream {
   public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
   public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
+  public readonly onStreamUpdate = new EventEmitter<() => void>();
   public readonly onStreamFinished = new EventEmitter<() => void>();
 
   public readonly onError = new EventEmitter<(error: unknown) => void>();
@@ -112,6 +113,8 @@ export class AudioStream {
           end
         }
       });
+
+      this.onStreamUpdate.emit();
     }
 
     this._mediaSourceAppender.end();
