@@ -15,6 +15,7 @@ export class MediaController<T extends HTMLMediaElement> {
   public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
   public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
+  public readonly onSeeking = new EventEmitter<(currentTime: number) => void>();
   public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
 
   public readonly media: T;
@@ -51,6 +52,10 @@ export class MediaController<T extends HTMLMediaElement> {
     });
 
     this.media.addEventListener("waiting", () => this._onStalled(), {
+      signal: this._abortController.signal
+    });
+
+    this.media.addEventListener("seeking", () => this.onSeeking.emit(this.media.currentTime), {
       signal: this._abortController.signal
     });
 

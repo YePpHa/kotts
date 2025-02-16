@@ -14,6 +14,7 @@ interface AppProps {
   currentTime: Signal<number>;
   duration: Signal<number>;
   autoScrolling: Signal<boolean>;
+  autoScrollingDirection: Signal<"up" | "down">;
   onPlayPauseClick: () => void;
   onEnableAutoScrollingClick: () => void;
 }
@@ -25,6 +26,7 @@ const App = (props: AppProps) => {
       currentTime={props.currentTime.value}
       duration={props.duration.value}
       autoScrolling={props.autoScrolling.value}
+      autoScrollingDirection={props.autoScrollingDirection.value}
       onPlayPauseClick={props.onPlayPauseClick}
       onEnableAutoScrollingClick={props.onEnableAutoScrollingClick}
     />
@@ -36,6 +38,7 @@ interface Options {
   currentTime: number;
   duration: number;
   autoScrolling: boolean;
+  autoScrollingDirection: "up" | "down";
   onPlayPauseClick: () => void;
   onEnableAutoScrollingClick: () => void;
 }
@@ -51,6 +54,7 @@ export function setupUi(options: Options) {
   const currentTimeSignal = signal(options.currentTime);
   const durationSignal = signal(options.duration);
   const autoScrollingSignal = signal(options.autoScrolling);
+  const autoScrollingDirectionSignal = signal(options.autoScrollingDirection);
 
   render(
     <App
@@ -58,6 +62,7 @@ export function setupUi(options: Options) {
       currentTime={currentTimeSignal}
       duration={durationSignal}
       autoScrolling={autoScrollingSignal}
+      autoScrollingDirection={autoScrollingDirectionSignal}
       onPlayPauseClick={options.onPlayPauseClick}
       onEnableAutoScrollingClick={options.onEnableAutoScrollingClick}
     />,
@@ -77,5 +82,8 @@ export function setupUi(options: Options) {
     setAutoScrolling: (enabled: boolean) => {
       autoScrollingSignal.value = enabled;
     },
+    setAutoScrollingDirection: (direction: "up" | "down") => {
+      autoScrollingDirectionSignal.value = direction;
+    }
   };
 }

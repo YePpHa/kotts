@@ -14,13 +14,13 @@
     0px 0px 5px 0px color-mix(in oklab, var(--tw-ring-color) 1%, transparent);
 }
 
-.animate-slide-in {
-  animation: 0.05s animation-slide-in 0.35s ease-out;
+.animate-top-slide-in {
+  animation: 0.05s animation-top-slide-in 0.35s ease-out;
   animation-fill-mode: forwards;
   transform: translateY(200%);
 }
 
-@keyframes animation-slide-in {
+@keyframes animation-top-slide-in {
   from {
     transform: translateY(200%);
   }
@@ -28,3 +28,19 @@
     transform: translateY(0);
   }
 }
+
+.animate-bottom-slide-in {
+  animation: 0.05s animation-bottom-slide-in 0.35s ease-out;
+  animation-fill-mode: forwards;
+  transform: translateY(-200%);
+}
+
+@keyframes animation-bottom-slide-in {
+  from {
+    transform: translateY(-200%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+

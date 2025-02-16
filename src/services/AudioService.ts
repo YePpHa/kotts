@@ -21,6 +21,7 @@ export class AudioService {
     this._audioStream = new AudioStream(this._createStreams(texts), {
       autoPlay: true
     });
+    this._audioStream.onError.add((error) => console.error(error));
     this._audioStream.onTimeUpdate.add((currentTime) => this.onTimeUpdate.emit(currentTime));
     this._audioStream.onStateChange.add((state) => this.onStateChange.emit(state));
     this._audioStream.onDurationChange.add((duration) => this.onDurationChange.emit(duration));

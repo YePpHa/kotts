@@ -59,6 +59,7 @@ export class AudioStream {
       try {
         await this._processStreams();
       } catch (err) {
+        console.error(err);
         if (err instanceof Error) {
           if (err.name === "AbortError") {
             return;
@@ -74,6 +75,8 @@ export class AudioStream {
     for await (const { type, stream } of this._streams) {
       const start = this._mediaSourceAppender.duration;
 
+      let buffer: Uint8Array | null = null;
+
       const reader = stream.getReader();
       while (true) {
         const { done, value } = await reader.read();
@@ -81,7 +84,19 @@ export class AudioStream {
           break;
         }
 
-        await this._mediaSourceAppender.next(type, value);
+        if (buffer === null) {
+          buffer = new Uint8Array(value.byteLength);
+          buffer.set(value, 0);
+        } else {
+          const prevBuffer: Uint8Array = buffer;
+          buffer = new Uint8Array(prevBuffer.byteLength + value.byteLength);
+          buffer.set(prevBuffer, 0);
+          buffer.set(value, prevBuffer.byteLength);
+        }
+      }
+
+      if (buffer !== null) {
+        await this._mediaSourceAppender.next(type, buffer);
       }
 
       reader.releaseLock();

@@ -1,7 +1,7 @@
 import { Component } from "preact";
 import { PlayButtonComponent } from "./PlayButtonComponent";
 import { Button } from "./Button";
-import { ArrowUp, AudioLines, User } from "lucide-preact";
+import { ArrowDown, ArrowUp, AudioLines, User } from "lucide-preact";
 
 interface SidebarComponentProps {
   onPlayPauseClick?: () => void;
@@ -10,6 +10,7 @@ interface SidebarComponentProps {
   currentTime: number;
   duration: number;
   autoScrolling: boolean;
+  autoScrollingDirection: "up" | "down";
 }
 
 export class SidebarComponent extends Component<SidebarComponentProps> {
@@ -21,6 +22,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
       currentTime,
       duration,
       autoScrolling,
+      autoScrollingDirection,
     } = this.props;
 
     const currentTimeString = `${
@@ -29,8 +31,8 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
 
     return (
       <aside class="fixed right-4 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
-        {!autoScrolling && isPlaying && (
-          <div class="absolute -top-[48px] bg-neutral-900 rounded-full mb-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-slide-in z-0">
+        {!autoScrolling && isPlaying && autoScrollingDirection === "up" && (
+          <div class="absolute -top-[48px] bg-neutral-900 rounded-full mb-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-top-slide-in z-0">
             <Button size={40} onClick={onEnableAutoScrollingClick} className="">
               <ArrowUp size={24} color="#ffffff" strokeWidth={2} />
             </Button>
@@ -55,6 +57,13 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
             <AudioLines size={18} color="#ffffff" strokeWidth={2} />
           </Button>
         </div>
+        {!autoScrolling && isPlaying && autoScrollingDirection === "down" && (
+          <div class="absolute -bottom-[48px] bg-neutral-900 rounded-full mt-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-bottom-slide-in z-0">
+            <Button size={40} onClick={onEnableAutoScrollingClick} className="">
+              <ArrowDown size={24} color="#ffffff" strokeWidth={2} />
+            </Button>
+          </div>
+        )}
       </aside>
     );
   }

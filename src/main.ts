@@ -25,11 +25,13 @@ const {
   setCurrentTime,
   setDuration,
   setAutoScrolling,
+  setAutoScrollingDirection,
 } = setupUi({
   isPlaying: ttsService.isPlaying(),
   currentTime: ttsService.currentTime,
   duration: ttsService.duration,
   autoScrolling: ttsService.isAutoScrolling(),
+  autoScrollingDirection: "up",
   onEnableAutoScrollingClick: () => {
     ttsService.setAutoScrolling(true);
   },
