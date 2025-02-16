@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ITTSApiService, TTSOptions, TTSResponse, WordTimestamp } from "../types/ITTSApiService";
+import { firstMatch } from "../utils/Text";
 
 export type KokoroTTSApiServiceOptions = {
   apiURL: string;
@@ -87,22 +88,18 @@ export class KokoroTTSApiService implements ITTSApiService {
         continue;
       }
 
-      const start = text.indexOf(timestamp.word, offset);
-      if (start === -1) {
+      const range = firstMatch(timestamp.word, text, offset);
+      if (range === null) {
         continue;
       }
-      const end = start + timestamp.word.length;
       wordTimestamps.push({
         timeRange: {
           start: timestamp.start_time,
           end: timestamp.end_time,
         },
-        textRange: {
-          start,
-          end,
-        },
+        textRange: range,
       });
-      offset = end;
+      offset = range.end;
     }
 
     return wordTimestamps;

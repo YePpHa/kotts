@@ -4,6 +4,7 @@ import { KokoroTTSApiService } from "./services/KokoroTTSApiService";
 import { TTSService } from "./services/TTSService";
 import { injectStyle } from "./style";
 import { setupUi } from "./ui";
+import { firstMatch } from "./utils/Text";
 
 console.log("Starting TTS service");
 injectStyle();
@@ -17,6 +18,7 @@ const textExtractor = new RoyalRoadTextExtractor();
 const ttsService = new TTSService(kokoroApiService, textExtractor);
 
 (window as any)["ttsService"] = ttsService;
+(window as any)["firstMatch"] = firstMatch;
 
 const {
   setPlaying,
