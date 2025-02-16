@@ -119,7 +119,11 @@ export class TTSService {
       return;
     }
 
-    this._updateHighlight();
+    try {
+      this._updateHighlight();
+    } catch (err) {
+      console.error("Error on highlighting word", err);
+    }
     window.requestAnimationFrame(() => this._highlightLoop());
   }
 
