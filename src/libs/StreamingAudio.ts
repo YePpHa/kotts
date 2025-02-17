@@ -365,7 +365,11 @@ export class StreamingAudio {
 
     // 3) Listen to events
     controller.onTimeUpdate.add((localTime) => {
-      if (this._currentChunkIndex !== idx || this._preferredPlaybackState === PlaybackState.Ended) {
+      if (
+        this._currentChunkIndex !== idx ||
+        this._preferredPlaybackState === PlaybackState.Ended ||
+        this._bufferingState === BufferingState.Buffering
+      ) {
         return;
       }
 
