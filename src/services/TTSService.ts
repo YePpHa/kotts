@@ -1,35 +1,29 @@
 import { EventEmitter } from "../libs/EventEmitter";
 import { BufferingState, PlaybackState } from "../libs/MediaController";
+import { StreamingAudio } from "../libs/StreamingAudio";
 import { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
 import type { ITTSApiService } from "../types/ITTSApiService";
-import { getCommonAncestor, isElementNode, isTextNode } from "../utils/Node";
 import { throttle } from "../utils/Timings";
 import { AudioService } from "./AudioService";
 import { HighligherService } from "./HighlighterService";
 
 export class TTSService {
-  public readonly onStateChange = new EventEmitter<
-    (state: PlaybackState) => void
+  public readonly onAutoScrollingChange = new EventEmitter<
+    (result: { direction: "up" | "down"; enabled: boolean }) => void
+  >();
+  public readonly onSegmentHighlight = new EventEmitter<
+    (segmentIndex: number, segmentElement: HTMLElement | null) => void
   >();
   public readonly onBufferingStateChange = new EventEmitter<
     (state: BufferingState) => void
-  >();
-  public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
-  public readonly onDurationChange = new EventEmitter<
-    (duration: number) => void
-  >();
-  public readonly onAutoScrollingChange = new EventEmitter<
-    (enabled: boolean) => void
-  >();
-  public readonly onSegmentHighlight = new EventEmitter<
-    (segmentIndex: number, segmentElement: HTMLElement) => void
   >();
 
   private _abortController = new AbortController();
 
   private _audioService: AudioService;
   private _textExtractor: ITextExtractor;
+
   private _segments: TextSegment[];
   private _highlighter = new HighligherService();
   private _lastHighlightedWord: {
@@ -37,10 +31,7 @@ export class TTSService {
     textRange: IRange;
     startTime: number;
   } | null = null;
-
-  private _playing = false;
-  private _buffering = false;
-  private _notLoadedBuffering = false;
+  private _lastScrollDirection: "up" | "down" = "up";
 
   private _playSegmentIndex = -1;
 
@@ -53,26 +44,13 @@ export class TTSService {
     );
 
     this._audioService = new AudioService(ttsApiService, texts);
-    this._audioService.onStateChange.add((state) => this._onStateChange(state));
-    this._audioService.onTimeUpdate.add((time) => this.onTimeUpdate.emit(time));
-    this._audioService.onBufferingStateChange.add((state) => {
-      const isBuffering = this.buffering;
+    this._audioService.onError.add((err) => console.error(err));
 
-      this._buffering = state === BufferingState.Buffering;
-      if (isBuffering !== this.buffering) {
-        this.onBufferingStateChange.emit(state);
-      }
+    window.addEventListener("scroll", () => this._handleScroll(), {
+      signal: this._abortController.signal,
     });
-    this._audioService.onDurationChange.add((duration) =>
-      this.onDurationChange.emit(duration)
-    );
-    this._audioService.onStreamUpdate.add(() => this._onStreamUpdate());
 
-    window.addEventListener("wheel", () => {
-      this._highlighter.setAutoScrolling(false);
-
-      this.onAutoScrollingChange.emit(false);
-    }, {
+    window.addEventListener("wheel", () => this._handleScroll(true), {
       signal: this._abortController.signal,
     });
 
@@ -83,6 +61,20 @@ export class TTSService {
         signal: this._abortController.signal,
       },
     );
+
+    this.audio.onStateChange.add((state) => this._onStateChange(state));
+    this.audio.onBufferingStateChange.add((state) =>
+      this.onBufferingStateChange.emit(state)
+    );
+    this._audioService.onSegmentLoad.add(() => this._onBufferAppended());
+    this._audioService.onSegmentEnd.add(() => this._onBufferEnd());
+    this._highlighter.onHighlightChange.add(() =>
+      this._handleHighlightChange()
+    );
+  }
+
+  public get audio(): StreamingAudio {
+    return this._audioService.audio;
   }
 
   public [Symbol.dispose]() {
@@ -90,20 +82,16 @@ export class TTSService {
     this._abortController.abort();
   }
 
-  public get buffering(): boolean {
-    return this._notLoadedBuffering || this._buffering;
+  public getScrollDirection(): "up" | "down" {
+    return this._lastScrollDirection;
   }
 
-  public play(): void {
-    this._audioService.play();
-  }
-
-  public pause(): void {
-    this._audioService.pause();
-
-    if (this._lastHighlightedWord !== null) {
-      this._audioService.currentTime = this._lastHighlightedWord.startTime;
+  public getBufferingState(): BufferingState {
+    if (this._playSegmentIndex !== -1) {
+      return BufferingState.Buffering;
     }
+
+    return this.audio.getBufferingState();
   }
 
   public playSegment(index: number): void {
@@ -113,35 +101,84 @@ export class TTSService {
 
     const chapters = this._audioService.getStreamChapters();
     if (index >= chapters.length) {
-      if (this._audioService.streamFinished) {
+      if (this._audioService.completed) {
         console.warn("Stream is finished, cannot play segment");
         return;
       }
 
-      this.pause();
+      this.audio.pause();
 
-      this._notLoadedBuffering = true;
-      this.onBufferingStateChange.emit(BufferingState.Buffering);
       this._playSegmentIndex = index;
+      this.onBufferingStateChange.emit(BufferingState.Buffering);
       return;
     }
 
     const chapter = chapters[index];
-    this._audioService.currentTime = chapter.timeRange.start;
-    const isBuffering = this.buffering;
-    if (isBuffering) {
-      this._notLoadedBuffering = false;
-      if (!this._buffering) {
-        this.onBufferingStateChange.emit(BufferingState.Ready);
-      }
-    }
-    this.play();
+    this.audio.currentTime = chapter.timeRange.start;
+
+    this.audio.play();
   }
 
-  private _onStreamUpdate(): void {
+  public setAutoScrolling(enabled: boolean): void {
+    this._highlighter.setAutoScrolling(enabled);
+
+    if (enabled) {
+      const currentHighlight = document.querySelector<HTMLElement>(
+        ".kokotts-highlight",
+      );
+      if (currentHighlight) {
+        this._highlighter.scrollIntoView(currentHighlight);
+      }
+    }
+
+    this.onAutoScrollingChange.emit({ direction: "up", enabled });
+  }
+
+  private _handleHighlightChange() {
+    if (this._highlighter.isAutoScrolling()) {
+      return;
+    }
+
+    this._handleScroll();
+  }
+
+  private _handleScroll(forceOff: boolean = false) {
+    if (
+      this._highlighter.scrolling && !forceOff ||
+      this._audioService.audio.getPlaybackState() !== PlaybackState.Play
+    ) {
+      return;
+    }
+
+    let direction: "up" | "down" = "up";
+    const currentHighlight = document.querySelector<HTMLElement>(
+      ".kokotts-highlight",
+    );
+    if (currentHighlight) {
+      const rect = currentHighlight.getBoundingClientRect();
+      const viewportHeight = window.innerHeight;
+      const isAboveCenter = rect.top < viewportHeight / 2;
+      direction = isAboveCenter ? "up" : "down";
+    }
+
+    const lastAutoScrolling = this._highlighter.isAutoScrolling();
+
+    if (lastAutoScrolling || this._lastScrollDirection !== direction) {
+      this._lastScrollDirection = direction;
+      this._highlighter.setAutoScrolling(false);
+      this.onAutoScrollingChange.emit({ direction, enabled: false });
+    }
+  }
+
+  public isAutoScrolling(): boolean {
+    return this._highlighter.isAutoScrolling();
+  }
+
+  private _onBufferAppended(): void {
     if (this._playSegmentIndex === -1) {
       return;
     }
+
     const segmentIndex = this._playSegmentIndex;
     this._playSegmentIndex = -1;
 
@@ -152,44 +189,19 @@ export class TTSService {
     }
 
     const chapter = chapters[segmentIndex];
-    this._audioService.currentTime = chapter.timeRange.start;
-    const isBuffering = this.buffering;
-    if (isBuffering) {
-      this._notLoadedBuffering = false;
-      if (!this._buffering) {
-        this.onBufferingStateChange.emit(BufferingState.Ready);
-      }
+    this.audio.currentTime = chapter.timeRange.start;
+
+    this.audio.play();
+  }
+
+  private _onBufferEnd(): void {
+    if (this._playSegmentIndex === -1) {
+      return;
     }
 
-    this.play();
-  }
-
-  public isPlaying(): boolean {
-    return this._playing;
-  }
-
-  public setAutoScrolling(enabled: boolean): void {
-    this._highlighter.setAutoScrolling(enabled);
-
-    const currentHighlight = document.querySelector(".kokotts-highlight");
-    currentHighlight?.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-
-    this.onAutoScrollingChange.emit(enabled);
-  }
-
-  public isAutoScrolling(): boolean {
-    return this._highlighter.isAutoScrolling();
-  }
-
-  public get currentTime(): number {
-    return this._audioService.currentTime;
-  }
-
-  public get duration(): number {
-    return this._audioService.duration;
+    this._playSegmentIndex = -1;
+    this.onBufferingStateChange.emit(this.getBufferingState());
+    console.error("Buffering ended without playing segment");
   }
 
   private _onStateChange(state: PlaybackState): void {
@@ -197,18 +209,15 @@ export class TTSService {
       this._highlighter.clear();
     }
 
-    this._playing = state === PlaybackState.Play;
-    if (this._playing) {
+    if (state === PlaybackState.Play) {
       this._highlightLoop();
     }
 
     this._playSegmentIndex = -1;
-
-    this.onStateChange.emit(state);
   }
 
   private _highlightLoop(): void {
-    if (!this._playing) {
+    if (this.audio.getPlaybackState() !== PlaybackState.Play) {
       return;
     }
 
@@ -221,7 +230,7 @@ export class TTSService {
   }
 
   private _updateHighlight(): void {
-    const word = this._getWordAtTime(this._audioService.currentTime);
+    const word = this._getWordAtTime(this.audio.currentTime);
     if (word === null) {
       return;
     }
@@ -358,7 +367,7 @@ export class TTSService {
 
     const { container } = this._segments[segmentIndex];
     this.onSegmentHighlight.emit(segmentIndex, container);
-  });
+  }, 33);
 
   private _getSegmentIndexAtElement(element: Node): number {
     let focusedIndex = -1;

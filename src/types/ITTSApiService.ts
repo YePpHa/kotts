@@ -13,7 +13,7 @@ export interface WordTimestamp {
 }
 
 export interface TTSOptions {
-  abortSignal: AbortSignal;
+  signal: AbortSignal;
 }
 
 export interface ITTSApiService {

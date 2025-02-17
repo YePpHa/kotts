@@ -1,7 +1,15 @@
+import { EventEmitter } from "../libs/EventEmitter";
+import { ScrollingService } from "./ScrollingService";
+
 export class HighligherService {
+  public onHighlightChange = new EventEmitter<() => void>();
+
   private _restoreMap = new Map<Node, Node[]>();
 
   private _autoScrolling = true;
+
+  private _scrollingId = 0;
+  public scrolling = false;
 
   public setAutoScrolling(enabled: boolean) {
     this._autoScrolling = enabled;
@@ -39,7 +47,7 @@ export class HighligherService {
       .filter(range => !range.collapsed);
   }
 
-  public highlightBrowserRange(range: Range, prevRect?: DOMRect) {
+  public highlightBrowserRange(range: Range, prevRect?: DOMRect): void {
     if (
       range.startContainer !== range.endContainer
       || range.startContainer.nodeType !== Node.TEXT_NODE
@@ -48,6 +56,8 @@ export class HighligherService {
     }
 
     const originalTextNode = range.startContainer;
+
+    let highlightElements: HTMLElement[] = [];
 
     const ranges = this._getSplitRange(range);
     for (const range of ranges) {
@@ -91,11 +101,27 @@ export class HighligherService {
         }
       }
 
-      if (this._autoScrolling) {
-        wrapperNode.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
+      highlightElements.push(wrapperNode);
+    }
+
+    const firstHighlight = highlightElements.at(0);
+    if (this._autoScrolling && firstHighlight) {
+      this.scrollIntoView(firstHighlight);
+    }
+    this.onHighlightChange.emit();
+  }
+
+  public async scrollIntoView(element: HTMLElement): Promise<void> {
+    const scrollingId = ++this._scrollingId;
+    try {
+      this.scrolling = true;
+      await ScrollingService.scrollIntoView(element, {
+        behavior: "smooth",
+        block: "center",
+      });
+    } finally {
+      if (scrollingId === this._scrollingId) {
+        this.scrolling = false;
       }
     }
   }

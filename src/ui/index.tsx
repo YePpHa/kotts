@@ -1,9 +1,8 @@
 import { render } from "preact";
 import { Signal, signal } from "@preact/signals";
 import { SidebarComponent } from "./components/SidebarComponent";
-import content from "./style.css" with { type: "css" };
+import styleContent from "./style.css" with { type: "css" };
 import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
-import { set } from "zod";
 
 function createStylesheet(content: string) {
   const style = new CSSStyleSheet();
@@ -66,7 +65,7 @@ export function setupUi(options: Options) {
   uiContainer.className = "kokotts-ui";
   document.body.appendChild(uiContainer);
   const shadowRoot = uiContainer.attachShadow({ mode: "open" });
-  shadowRoot.adoptedStyleSheets = [createStylesheet(content)];
+  shadowRoot.adoptedStyleSheets = [createStylesheet(styleContent)];
 
   const isPlayingSignal = signal(options.isPlaying);
   const bufferingSignal = signal(options.buffering);

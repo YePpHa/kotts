@@ -22,7 +22,7 @@ export default {
       const result = await postcss(plugins).process(css, options);
 
       return {
-        contents: result.css,
+        contents: result.css.replaceAll(":root", ":host"),
         loader: "text",
       };
     });

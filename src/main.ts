@@ -29,10 +29,10 @@ const {
   setAutoScrollingDirection,
   setSegmentHover,
 } = setupUi({
-  isPlaying: ttsService.isPlaying(),
-  buffering: ttsService.buffering,
-  currentTime: ttsService.currentTime,
-  duration: ttsService.duration,
+  isPlaying: ttsService.audio.getPlaybackState() === PlaybackState.Play,
+  buffering: ttsService.getBufferingState() === BufferingState.Buffering,
+  currentTime: ttsService.audio.currentTime,
+  duration: ttsService.audio.duration,
   autoScrolling: ttsService.isAutoScrolling(),
   autoScrollingDirection: "up",
   segmentHoverElement: null,
@@ -41,10 +41,10 @@ const {
     ttsService.setAutoScrolling(true);
   },
   onPlayPauseClick: () => {
-    if (ttsService.isPlaying()) {
-      ttsService.pause();
+    if (ttsService.audio.getPlaybackState() === PlaybackState.Play) {
+      ttsService.audio.pause();
     } else {
-      ttsService.play();
+      ttsService.audio.play();
     }
   },
   onSegmentHoverPlayClick: (index) => {
@@ -53,26 +53,27 @@ const {
   },
 });
 
-ttsService.onStateChange.add((state) => {
+ttsService.audio.onStateChange.add((state) => {
   setPlaying(state === PlaybackState.Play);
 });
 
-ttsService.onTimeUpdate.add((currentTime) => {
+ttsService.audio.onTimeUpdate.add((currentTime) => {
   setCurrentTime(currentTime);
 });
 
-ttsService.onDurationChange.add((duration) => {
+ttsService.audio.onDurationChange.add((duration) => {
   setDuration(duration);
-});
-
-ttsService.onAutoScrollingChange.add((enabled) => {
-  setAutoScrolling(enabled);
-});
-
-ttsService.onSegmentHighlight.add((index, element) => {
-  setSegmentHover(index, element);
 });
 
 ttsService.onBufferingStateChange.add((state) => {
   setBuffering(state === BufferingState.Buffering);
+});
+
+ttsService.onAutoScrollingChange.add(({ enabled, direction }) => {
+  setAutoScrolling(enabled);
+  setAutoScrollingDirection(direction);
+});
+
+ttsService.onSegmentHighlight.add((index, element) => {
+  setSegmentHover(index, element);
 });

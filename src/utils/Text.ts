@@ -2,6 +2,11 @@ import diff, { EQUAL, DELETE, INSERT } from "fast-diff";
 import { IRange } from "../types/IRange";
 
 export function firstMatch(needle: string, haystack: string, offset: number): IRange | null {
+  const idx = haystack.indexOf(needle, offset);
+  if (idx !== -1) {
+    return { start: idx, end: idx + needle.length };
+  }
+
   for (let i = Math.min(offset + needle.length, haystack.length); i <= haystack.length; i++) {
     const matches = diff(haystack.slice(offset, i), needle, 0, false);
     if (i + 1 <= haystack.length && matches.length > 0) {

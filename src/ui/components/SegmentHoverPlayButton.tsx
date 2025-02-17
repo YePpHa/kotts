@@ -17,6 +17,20 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
       onPlayClick,
     } = this.props;
 
+    const lineHeight = computed(() => {
+      const value = segmentHoverElement.value;
+      if (value === null) {
+        return null;
+      }
+      const lineHeight = window.getComputedStyle(value, null).getPropertyValue("line-height");
+      const num = Number.parseFloat(lineHeight);
+      if (Number.isNaN(num)) {
+        return null;
+      }
+
+      return num;
+    });
+
     const rect = computed(() => {
       const value = segmentHoverElement.value;
       if (value === null) {
@@ -31,7 +45,7 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
       }
       return value.getBoundingClientRect();
     })
-    if (rect.value === null || parentRect.value === null) {
+    if (rect.value === null || parentRect.value === null || lineHeight.value === null) {
       return null;
     }
 
@@ -39,7 +53,8 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
 
     const scrollTop = window.scrollY;
     const scrollLeft = window.scrollX;
-    const top = rect.value.top + scrollTop + rect.value.height / 2 - SIZE / 2;
+    const top = rect.value.top + scrollTop + lineHeight.value / 2 - SIZE / 2;
+    // const top = rect.value.top + scrollTop;
     const left = parentRect.value.left + scrollLeft - 48;
 
     return (
@@ -47,7 +62,8 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
         <Button
           onClick={() => onPlayClick(segmentHoverIndex.value)}
           size={SIZE}
-          className="ring-sky-300 glow"
+          className="ring-sky-300 glow bg-sky-500 hover:bg-sky-400"
+          defaultBackground={false}
         >
           <Play fill="#ffffff" strokeWidth={0} width={18} height={18} />
         </Button>

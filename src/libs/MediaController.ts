@@ -1,78 +1,76 @@
+/**
+ * MediaController.ts
+ *
+ * Controls one <audio> or <video> element, enforcing a "preferred" playback state.
+ */
 import { EventEmitter } from "./EventEmitter";
 
+/**
+ * High-level playback states that the user *prefers*.
+ * The actual media element may be in a different state, but we try to enforce this.
+ */
 export enum PlaybackState {
-  Play = "play",
-  Pause = "pause",
-  Ended = "ended"
+  Play = 'play',
+  Pause = 'pause',
+  Ended = 'ended',
 }
 
+/**
+ * Buffering states for the media or chunked streaming:
+ * - Buffering = "we are waiting for data or have insufficient data to continue"
+ * - Ready = "we have enough data to play or seek"
+ */
 export enum BufferingState {
-  Buffering = "buffering",
-  Ready = "ready"
+  Buffering = 'buffering',
+  Ready = 'ready',
 }
+
 
 export class MediaController<T extends HTMLMediaElement> {
-  public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
-  public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
+  public readonly onStateChange = new EventEmitter<
+    (state: PlaybackState) => void
+  >();
+  public readonly onBufferingStateChange = new EventEmitter<
+    (state: BufferingState) => void
+  >();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
-  public readonly onSeeking = new EventEmitter<(currentTime: number) => void>();
-  public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
+  public readonly onSeeking = new EventEmitter<(time: number) => void>();
+  public readonly onDurationChange = new EventEmitter<
+    (duration: number) => void
+  >();
 
   public readonly media: T;
 
   private _abortController = new AbortController();
-
   private _preferredPlaybackState: PlaybackState = PlaybackState.Pause;
-  
+
   constructor(media: T) {
     this.media = media;
 
-    this.media.addEventListener("playing", () => this._onPlaying(), {
-      signal: this._abortController.signal
-    });
+    const signal = this._abortController.signal;
 
-    this.media.addEventListener("pause", () => this._onPause(), {
-      signal: this._abortController.signal
+    media.addEventListener("playing", () => this._onPlaying(), { signal });
+    media.addEventListener("pause", () => this._onPause(), { signal });
+    media.addEventListener("ended", () => this._onEnded(), { signal });
+    media.addEventListener("canplay", () => this._onCanplay(), { signal });
+    media.addEventListener("stalled", () => this._onStalled(), { signal });
+    media.addEventListener("suspend", () => this._onStalled(), { signal });
+    media.addEventListener("waiting", () => this._onStalled(), { signal });
+    media.addEventListener(
+      "seeking",
+      () => this.onSeeking.emit(this.media.currentTime),
+      { signal },
+    );
+    media.addEventListener("seeked", () => this._onCanplay(), { signal });
+    media.addEventListener("timeupdate", () => this._onTimeUpdate(), {
+      signal,
     });
-
-    this.media.addEventListener("ended", () => this._onEnded(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("canplay", () => this._onCanplay(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("stalled", () => this._onStalled(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("suspend", () => this._onStalled(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("waiting", () => this._onStalled(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("seeking", () => this.onSeeking.emit(this.media.currentTime), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("seeked", () => this._onCanplay(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("timeupdate", () => this._onTimeUpdate(), {
-      signal: this._abortController.signal
-    });
-
-    this.media.addEventListener("durationchange", () => this._onDurationChange(), {
-      signal: this._abortController.signal
+    media.addEventListener("durationchange", () => this._onDurationChange(), {
+      signal,
     });
   }
 
-  public [Symbol.dispose]() {
+  public [Symbol.dispose](): void {
     this._abortController.abort();
     this.media.pause();
     this.media.src = "";
@@ -102,97 +100,113 @@ export class MediaController<T extends HTMLMediaElement> {
     this.media.volume = value;
   }
 
+  /**
+   * The user wants to play. We set the "preferred" state to Play and
+   * attempt to call `media.play()`.
+   */
   public async play(): Promise<void> {
     this._preferredPlaybackState = PlaybackState.Play;
     this.onStateChange.emit(this._preferredPlaybackState);
 
     try {
-      await this.media.play();
-    } catch (err) {
-      if (!(err instanceof Error)) {
-        console.error("Error occurred on audio play", err);
-        throw err;
+      if (!this.media.paused && !this.media.ended && this.media.currentTime > 0 && this.media.readyState > HTMLMediaElement.HAVE_CURRENT_DATA) {
+        return;
       }
 
-      if (err.name === "NotAllowedError") {
+      await this.media.play();
+    } catch (err) {
+      // Possibly NotAllowedError if no user gesture
+      if (err instanceof Error && err.name === "NotAllowedError") {
         this._preferredPlaybackState = PlaybackState.Pause;
         this.onStateChange.emit(this._preferredPlaybackState);
+      } else {
+        console.error("MediaController: error while playing:", err);
       }
     }
   }
 
+  /**
+   * Set "preferred" playback to Pause, and pause the media.
+   */
   public pause(): void {
     this._preferredPlaybackState = PlaybackState.Pause;
     this.onStateChange.emit(this._preferredPlaybackState);
-
     this.media.pause();
   }
 
-  public setPlaybackState(state: PlaybackState) {
+  /**
+   * Force a particular playback state: Play, Pause, or Ended.
+   */
+  public setPlaybackState(state: PlaybackState): void {
     if (this._preferredPlaybackState === state) {
       return;
     }
-
     this._preferredPlaybackState = state;
     this.onStateChange.emit(this._preferredPlaybackState);
+
+    if (state === PlaybackState.Play) {
+      void this.play();
+    } else if (state === PlaybackState.Pause) {
+      this.pause();
+    } else if (state === PlaybackState.Ended) {
+      this.media.pause();
+    }
   }
 
-  public getPlaybackState() {
+  public getPlaybackState(): PlaybackState {
     return this._preferredPlaybackState;
   }
 
+  /**
+   * Basic buffering check: if readyState < HAVE_FUTURE_DATA => "Buffering"
+   */
   public isBuffering(): boolean {
     return this.media.readyState < HTMLMediaElement.HAVE_FUTURE_DATA;
   }
 
   private _onPlaying(): void {
-    const state = this._preferredPlaybackState;
-    if (state !== PlaybackState.Pause) {
-      return;
+    // If we *prefer* Pause or Ended, then forcibly pause again
+    if (this._preferredPlaybackState !== PlaybackState.Play) {
+      this.media.pause();
     }
-
-    this.media.pause();
   }
 
   private _onPause(): void {
-    const state = this._preferredPlaybackState;
-    if (state === PlaybackState.Play) {
-      return;
+    // If we *prefer* Play, try to resume
+    if (this._preferredPlaybackState === PlaybackState.Play) {
+      void this.play();
     }
-
-    this._preferredPlaybackState = PlaybackState.Pause;
-    this.onStateChange.emit(this._preferredPlaybackState);
   }
 
   private _onEnded(): void {
+    // The media ended on its own
     this._preferredPlaybackState = PlaybackState.Ended;
     this.onStateChange.emit(this._preferredPlaybackState);
   }
 
   private _onCanplay(): void {
-    this.onBufferingStateChange.emit(this.isBuffering() ? BufferingState.Buffering : BufferingState.Ready);
+    // Possibly we are no longer buffering:
+    this._emitBufferingState();
 
-    if (this._preferredPlaybackState === PlaybackState.Pause) {
+    // If we prefer to play, ensure we are playing
+    if (
+      this._preferredPlaybackState === PlaybackState.Play && this.media.paused
+    ) {
+      void this.play();
+    } else if (this._preferredPlaybackState === PlaybackState.Pause) {
       this.media.pause();
-      return;
     }
-
-    this.play();
   }
 
   private _onStalled(): void {
-    this.onBufferingStateChange.emit(this.isBuffering() ? BufferingState.Buffering : BufferingState.Ready);
-
-    if (!this.isBuffering()) {
-      return;
-    }
-
-    if (this._preferredPlaybackState === PlaybackState.Pause) {
+    // Possibly we are buffering
+    this._emitBufferingState();
+    // If prefer to play, re-attempt
+    if (this._preferredPlaybackState === PlaybackState.Play) {
+      void this.play();
+    } else {
       this.media.pause();
-      return;
     }
-
-    this.play();
   }
 
   private _onTimeUpdate(): void {
@@ -201,5 +215,12 @@ export class MediaController<T extends HTMLMediaElement> {
 
   private _onDurationChange(): void {
     this.onDurationChange.emit(this.media.duration);
+  }
+
+  private _emitBufferingState(): void {
+    const state = this.isBuffering()
+      ? BufferingState.Buffering
+      : BufferingState.Ready;
+    this.onBufferingStateChange.emit(state);
   }
 }

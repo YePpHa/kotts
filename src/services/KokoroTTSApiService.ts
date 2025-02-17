@@ -21,6 +21,8 @@ export class KokoroTTSApiService implements ITTSApiService {
   private _speed: number;
   private _langCode?: string;
 
+  private _isM4aSupported = MediaSource.isTypeSupported("audio/mp4");
+
   constructor(options: Partial<KokoroTTSApiServiceOptions> = {}) {
     this._apiURL = options.apiURL ?? "http://127.0.0.1:8880";
     this._voice = options.voice ?? "af_heart";
@@ -42,10 +44,10 @@ export class KokoroTTSApiService implements ITTSApiService {
         "voice": this._voice,
         "speed": this._speed,
         "lang_code": this._langCode,
-        "response_format": "mp3",
+        "response_format": this._isM4aSupported ? "m4a" : "mp3",
         "return_download_link": false,
       }),
-      signal: options.abortSignal,
+      signal: options.signal,
     });
 
     const wordTimestamps = await this._getWordTimestamps(text, response.headers);
