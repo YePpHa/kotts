@@ -165,8 +165,10 @@ export class StreamingAudio {
 
   public async play(): Promise<void> {
     if (this._preferredPlaybackState === PlaybackState.Ended) {
-      // if we're already ended, we set currentTime to 0
-      this._seekTo(0);
+      if (this._currentTime >= this._duration) {
+        // if we're already ended, we set currentTime to 0 if we're at the end
+        this._seekTo(0);
+      }
     }
 
     this._preferredPlaybackState = PlaybackState.Play;
@@ -363,7 +365,7 @@ export class StreamingAudio {
 
     // 3) Listen to events
     controller.onTimeUpdate.add((localTime) => {
-      if (this._currentChunkIndex !== idx) {
+      if (this._currentChunkIndex !== idx || this._preferredPlaybackState === PlaybackState.Ended) {
         return;
       }
 
@@ -435,6 +437,7 @@ export class StreamingAudio {
       // No more chunks. If we've called end() and currentTime >= duration,
       // we finalize the entire playback as ended
       if (this._ended && this._currentTime >= this._duration) {
+        this._currentTime = this._duration;
         this.setPlaybackState(PlaybackState.Ended);
       } else {
         // Otherwise, we are "waiting for more data" => buffering
