@@ -24,7 +24,10 @@ export function getCommonAncestor(node1: Node, node2: Node): Node | null {
  * @param limitNode the node to stop at, will not check this node.
  * @return the nearest non-inline element, or null if none found.
  */
-export function findNearestNonInlineElement(node: Node, limitNode: Node): Node | null {
+export function findNearestNonInlineElement(
+  node: Node,
+  limitNode: Node,
+): Node | null {
   let currentNode: Node | null = node;
   while (currentNode !== limitNode && currentNode !== null) {
     if (isElementNode(currentNode)) {

@@ -1,5 +1,8 @@
 export class ScrollingService {
-  public static scrollIntoView(element: HTMLElement, options?: ScrollIntoViewOptions): Promise<void> {
+  public static scrollIntoView(
+    element: HTMLElement,
+    options?: ScrollIntoViewOptions,
+  ): Promise<void> {
     return new Promise((resolve) => {
       const abort = new AbortController();
       const done = () => {
@@ -9,7 +12,7 @@ export class ScrollingService {
       };
 
       window.addEventListener("scrollend", () => done(), {
-        signal: abort.signal
+        signal: abort.signal,
       });
 
       element.scrollIntoView(options);

@@ -17,5 +17,8 @@ export interface TTSOptions {
 }
 
 export interface ITTSApiService {
-  createSpeech(text: string, options?: Partial<TTSOptions>): Promise<TTSResponse>;
+  createSpeech(
+    text: string,
+    options?: Partial<TTSOptions>,
+  ): Promise<TTSResponse>;
 }

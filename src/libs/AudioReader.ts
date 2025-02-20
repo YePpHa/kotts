@@ -19,7 +19,7 @@ export class AudioReader {
   }
 
   public async *load(
-    audio: IStreamingMedia
+    audio: IStreamingMedia,
   ): AsyncGenerator<StreamChapter, void, void> {
     for await (const { type, stream } of this._streams) {
       const start = audio.duration;

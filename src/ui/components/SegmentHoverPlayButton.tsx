@@ -22,7 +22,9 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
       if (value === null) {
         return null;
       }
-      const lineHeight = window.getComputedStyle(value, null).getPropertyValue("line-height");
+      const lineHeight = window.getComputedStyle(value, null).getPropertyValue(
+        "line-height",
+      );
       const num = Number.parseFloat(lineHeight);
       if (Number.isNaN(num)) {
         return null;
@@ -44,8 +46,11 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
         return null;
       }
       return value.getBoundingClientRect();
-    })
-    if (rect.value === null || parentRect.value === null || lineHeight.value === null) {
+    });
+    if (
+      rect.value === null || parentRect.value === null ||
+      lineHeight.value === null
+    ) {
       return null;
     }
 
@@ -60,7 +65,8 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
     return (
       <aside class="absolute" style={{ top: `${top}px`, left: `${left}px` }}>
         <Button
-          onClick={() => onPlayClick(segmentHoverIndex.value)}
+          onClick={() =>
+            onPlayClick(segmentHoverIndex.value)}
           size={SIZE}
           className="ring-sky-300 glow bg-sky-500 hover:bg-sky-400"
           defaultBackground={false}

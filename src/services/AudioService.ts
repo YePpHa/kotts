@@ -61,7 +61,7 @@ export class AudioService {
   }
 
   private async *_createStreams(
-    texts: Iterable<string, void, void> | AsyncIterable<string, void, void>
+    texts: Iterable<string, void, void> | AsyncIterable<string, void, void>,
   ): AsyncIterable<StreamData, void, void> {
     for await (const text of texts) {
       a: {
@@ -79,7 +79,10 @@ export class AudioService {
             break a;
           } catch (err) {
             lastError = err;
-            console.warn({ error: err }, `Failed to create speech. Retrying ${i + 1}/${RETRY}...`);
+            console.warn(
+              { error: err },
+              `Failed to create speech. Retrying ${i + 1}/${RETRY}...`,
+            );
           }
         }
 

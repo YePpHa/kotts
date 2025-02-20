@@ -10,9 +10,9 @@ import { EventEmitter } from "./EventEmitter";
  * The actual media element may be in a different state, but we try to enforce this.
  */
 export enum PlaybackState {
-  Play = 'play',
-  Pause = 'pause',
-  Ended = 'ended',
+  Play = "play",
+  Pause = "pause",
+  Ended = "ended",
 }
 
 /**
@@ -21,10 +21,9 @@ export enum PlaybackState {
  * - Ready = "we have enough data to play or seek"
  */
 export enum BufferingState {
-  Buffering = 'buffering',
-  Ready = 'ready',
+  Buffering = "buffering",
+  Ready = "ready",
 }
-
 
 export class MediaController<T extends HTMLMediaElement> {
   public readonly onStateChange = new EventEmitter<
@@ -109,7 +108,10 @@ export class MediaController<T extends HTMLMediaElement> {
     this.onStateChange.emit(this._preferredPlaybackState);
 
     try {
-      if (!this.media.paused && !this.media.ended && this.media.currentTime > 0 && this.media.readyState > HTMLMediaElement.HAVE_CURRENT_DATA) {
+      if (
+        !this.media.paused && !this.media.ended && this.media.currentTime > 0 &&
+        this.media.readyState > HTMLMediaElement.HAVE_CURRENT_DATA
+      ) {
         return;
       }
 

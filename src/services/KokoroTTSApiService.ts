@@ -1,5 +1,10 @@
 import { z } from "zod";
-import type { ITTSApiService, TTSOptions, TTSResponse, WordTimestamp } from "../types/ITTSApiService";
+import type {
+  ITTSApiService,
+  TTSOptions,
+  TTSResponse,
+  WordTimestamp,
+} from "../types/ITTSApiService";
 import { firstMatch } from "../utils/Text";
 
 export type KokoroTTSApiServiceOptions = {
@@ -21,8 +26,6 @@ export class KokoroTTSApiService implements ITTSApiService {
   private _speed: number;
   private _langCode?: string;
 
-  private _isM4aSupported = MediaSource.isTypeSupported("audio/mp4");
-
   constructor(options: Partial<KokoroTTSApiServiceOptions> = {}) {
     this._apiURL = options.apiURL ?? "http://127.0.0.1:8880";
     this._voice = options.voice ?? "af_heart";
@@ -30,14 +33,17 @@ export class KokoroTTSApiService implements ITTSApiService {
     this._langCode = options.langCode;
   }
 
-  public async createSpeech(text: string, options: Partial<TTSOptions> = {}): Promise<TTSResponse> {
+  public async createSpeech(
+    text: string,
+    options: Partial<TTSOptions> = {},
+  ): Promise<TTSResponse> {
     const response = await fetch(`${this._apiURL}/dev/captioned_speech`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       mode: "cors",
-  
+
       body: JSON.stringify({
         "model": "kokoro",
         "input": text,
@@ -50,11 +56,14 @@ export class KokoroTTSApiService implements ITTSApiService {
       signal: options.signal,
     });
 
-    const wordTimestamps = await this._getWordTimestamps(text, response.headers);
+    const wordTimestamps = await this._getWordTimestamps(
+      text,
+      response.headers,
+    );
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.detail?.message || 'Failed to generate speech');
+      throw new Error(error.detail?.message || "Failed to generate speech");
     }
 
     if (response.body === null) {
@@ -68,21 +77,32 @@ export class KokoroTTSApiService implements ITTSApiService {
       wordTimestamps,
     };
   }
-  
-  private async _getWordTimestamps(text: string, headers: Headers): Promise<WordTimestamp[]> {
+
+  private async _getWordTimestamps(
+    text: string,
+    headers: Headers,
+  ): Promise<WordTimestamp[]> {
     if (headers.has("X-Word-Timestamps")) {
-      return this._parseWordTimestamps(text, JSON.parse(String(headers.get("X-Word-Timestamps"))));
+      return this._parseWordTimestamps(
+        text,
+        JSON.parse(String(headers.get("X-Word-Timestamps"))),
+      );
     }
-  
+
     if (headers.has("X-Timestamps-Path")) {
-      const response = await fetch(`${this._apiURL}/dev/timestamps/${headers.get("X-Timestamps-Path")}`);
+      const response = await fetch(
+        `${this._apiURL}/dev/timestamps/${headers.get("X-Timestamps-Path")}`,
+      );
       return this._parseWordTimestamps(text, JSON.parse(await response.text()));
     }
-  
+
     return [];
   }
 
-  private _parseWordTimestamps(text: string, timestamps: z.infer<typeof WordTimestampSchema>[]): WordTimestamp[] {
+  private _parseWordTimestamps(
+    text: string,
+    timestamps: z.infer<typeof WordTimestampSchema>[],
+  ): WordTimestamp[] {
     const wordTimestamps: WordTimestamp[] = [];
     let offset = 0;
     for (let i = 0; i < timestamps.length; i++) {

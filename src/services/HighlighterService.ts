@@ -32,9 +32,15 @@ export class HighligherService {
     for (const textNode of split) {
       const textLength = (textNode.textContent ?? "").length;
       const newRange = document.createRange();
-      
-      const start = Math.min(Math.max(range.startOffset - currentIndex, 0), textLength);
-      const end = Math.max(Math.min(range.endOffset - currentIndex, textLength), 0);
+
+      const start = Math.min(
+        Math.max(range.startOffset - currentIndex, 0),
+        textLength,
+      );
+      const end = Math.max(
+        Math.min(range.endOffset - currentIndex, textLength),
+        0,
+      );
 
       newRange.setStart(textNode, start);
       newRange.setEnd(textNode, end);
@@ -44,13 +50,13 @@ export class HighligherService {
     }
 
     return ranges
-      .filter(range => !range.collapsed);
+      .filter((range) => !range.collapsed);
   }
 
   public highlightBrowserRange(range: Range, prevRect?: DOMRect): void {
     if (
-      range.startContainer !== range.endContainer
-      || range.startContainer.nodeType !== Node.TEXT_NODE
+      range.startContainer !== range.endContainer ||
+      range.startContainer.nodeType !== Node.TEXT_NODE
     ) {
       return;
     }
@@ -68,7 +74,7 @@ export class HighligherService {
         textContent.slice(range.startOffset, range.endOffset),
         textContent.slice(range.endOffset),
       ]
-        .map(part => document.createTextNode(part))
+        .map((part) => document.createTextNode(part));
 
       const allSubNodes = this._restoreMap.get(originalTextNode);
       if (allSubNodes === undefined) {
@@ -91,7 +97,10 @@ export class HighligherService {
         if (rect.top === prevRect.top) {
           const diff = prevRect.left - rect.left;
           wrapperNode.style.setProperty("--animate-from-left", `${diff}px`);
-          wrapperNode.style.setProperty("--animate-from-width", `${prevRect.width}px`);
+          wrapperNode.style.setProperty(
+            "--animate-from-width",
+            `${prevRect.width}px`,
+          );
           wrapperNode.classList.add("kokotts-highlight--animate");
           window.requestAnimationFrame(() => {
             wrapperNode.style.removeProperty("--animate-from-left");
@@ -130,7 +139,10 @@ export class HighligherService {
     for (const [textNode, subNodes] of this._restoreMap) {
       const range = new Range();
       range.setStart(subNodes[0], 0);
-      range.setEnd(subNodes[subNodes.length - 1], (subNodes[subNodes.length - 1].textContent ?? "").length);
+      range.setEnd(
+        subNodes[subNodes.length - 1],
+        (subNodes[subNodes.length - 1].textContent ?? "").length,
+      );
 
       range.deleteContents();
       range.insertNode(textNode);
