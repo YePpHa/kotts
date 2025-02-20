@@ -33,9 +33,6 @@ const textExtractor = getTextExtractor();
 
 const ttsService = new TTSService(kokoroApiService, textExtractor);
 
-(window as any)["ttsService"] = ttsService;
-(window as any)["firstMatch"] = firstMatch;
-
 const {
   setPlaying,
   setBuffering,
