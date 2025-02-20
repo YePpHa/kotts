@@ -7,7 +7,6 @@ import { TTSService } from "./services/TTSService";
 import { injectStyle } from "./style";
 import type { ITextExtractor } from "./types/ITextExtractor";
 import { setupUi } from "./ui";
-import { firstMatch } from "./utils/Text";
 
 console.log("Starting TTS service");
 injectStyle();
