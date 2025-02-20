@@ -44,7 +44,7 @@ export class KokoroTTSApiService implements ITTSApiService {
         "voice": this._voice,
         "speed": this._speed,
         "lang_code": this._langCode,
-        "response_format": this._isM4aSupported ? "m4a" : "mp3",
+        "response_format": "mp3",
         "return_download_link": false,
       }),
       signal: options.signal,

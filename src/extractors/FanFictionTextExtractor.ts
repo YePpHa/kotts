@@ -1,9 +1,9 @@
 import type { ITextExtractor } from "../types/ITextExtractor";
 import { TextNodeExtractor } from "./TextNodeExtractor";
 
-export class RoyalRoadTextExtractor extends TextNodeExtractor
+export class FanFictionTextExtractor extends TextNodeExtractor
   implements ITextExtractor {
   constructor() {
-    super(".chapter-content");
+    super("#storytext");
   }
 }

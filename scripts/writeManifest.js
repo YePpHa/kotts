@@ -13,7 +13,7 @@ export async function writeManifest() {
     ],
     "content_scripts": [
       {
-        "matches": ["https://www.royalroad.com/fiction/*"],
+        "matches": ["https://www.royalroad.com/fiction/*", "https://www.scribblehub.com/read/*", "https://www.fanfiction.net/s/*"],
         "js": ["content_script.js"],
         "world": "MAIN"
       }

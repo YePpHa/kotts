@@ -1,19 +1,35 @@
+import { FanFictionTextExtractor } from "./extractors/FanFictionTextExtractor";
 import { RoyalRoadTextExtractor } from "./extractors/RoyalRoadTextExtractor";
+import { ScribbleHubTextExtractor } from "./extractors/ScribbleHubTextExtractor";
 import { BufferingState, PlaybackState } from "./libs/MediaController";
 import { KokoroTTSApiService } from "./services/KokoroTTSApiService";
 import { TTSService } from "./services/TTSService";
 import { injectStyle } from "./style";
+import type { ITextExtractor } from "./types/ITextExtractor";
 import { setupUi } from "./ui";
 import { firstMatch } from "./utils/Text";
 
 console.log("Starting TTS service");
 injectStyle();
 
+function getTextExtractor(): ITextExtractor {
+  const url = window.location.href;
+  if (url.startsWith("https://www.royalroad.com/")) {
+    return new RoyalRoadTextExtractor();
+  } else if (url.startsWith("https://www.scribblehub.com/")) {
+    return new ScribbleHubTextExtractor();
+  } else if (url.startsWith("https://www.fanfiction.net/")) {
+    return new FanFictionTextExtractor();
+  }
+
+  throw new Error("Unsupported site");
+}
+
 const kokoroApiService = new KokoroTTSApiService({
   apiURL: "http://127.0.0.1:8880",
   voice: "af_heart",
 });
-const textExtractor = new RoyalRoadTextExtractor();
+const textExtractor = getTextExtractor();
 
 const ttsService = new TTSService(kokoroApiService, textExtractor);
 
