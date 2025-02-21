@@ -41,7 +41,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
           </div>
         )}
         <div class="bg-neutral-900 rounded-2xl p-2 ring-sky-300 glow w-[48px] flex flex-col items-center space-y-4 z-10">
-          <span>
+          <span class="text-white">
             {currentTimeString}
           </span>
           <PlayButtonComponent

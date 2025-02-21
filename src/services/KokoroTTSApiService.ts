@@ -18,6 +18,8 @@ const WordTimestampSchema = z.object({
   word: z.string(),
   start_time: z.number(),
   end_time: z.number(),
+  start_index: z.number().optional(),
+  end_index: z.number().optional(),
 });
 
 export class KokoroTTSApiService implements ITTSApiService {
@@ -99,6 +101,31 @@ export class KokoroTTSApiService implements ITTSApiService {
     return [];
   }
 
+  private _getRangeForTimestamp(
+    text: string,
+    timestamp: z.infer<typeof WordTimestampSchema>,
+    offset: number,
+  ): { start: number; end: number } | null {
+    if (
+      timestamp.start_index !== undefined &&
+      timestamp.end_index !== undefined
+    ) {
+      if (timestamp.start_index === -1 || timestamp.end_index === -1) {
+        return null;
+      }
+
+      return { start: timestamp.start_index, end: timestamp.end_index };
+    }
+
+    const range = firstMatch(timestamp.word, text, offset);
+    console.warn("Using fallback matching for word", timestamp);
+    if (range === null) {
+      return null;
+    }
+
+    return range;
+  }
+
   private _parseWordTimestamps(
     text: string,
     timestamps: z.infer<typeof WordTimestampSchema>[],
@@ -111,11 +138,14 @@ export class KokoroTTSApiService implements ITTSApiService {
         continue;
       }
 
-      const range = firstMatch(timestamp.word, text, offset);
+      const range = this._getRangeForTimestamp(text, timestamp, offset);
       if (range === null) {
         continue;
       }
-      if (range.start === text.length && i < timestamps.length - 1) {
+      if (
+        timestamp.start_index !== undefined && range.start === text.length &&
+        i < timestamps.length - 1
+      ) {
         console.warn("Failed to find range for word", timestamp.word);
         range.start = offset + timestamp.word.length;
         range.end = offset + timestamp.word.length;

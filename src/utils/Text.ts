@@ -6,11 +6,6 @@ export function firstMatch(
   haystack: string,
   offset: number,
 ): IRange | null {
-  const idx = haystack.indexOf(needle, offset);
-  if (idx !== -1) {
-    return { start: idx, end: idx + needle.length };
-  }
-
   for (
     let i = Math.min(offset + needle.length, haystack.length);
     i <= haystack.length;
