@@ -46,10 +46,16 @@
   transition: width 0.15s ease-out, opacity 0.15s ease-out;
 }
 
-.group:hover .underline-expand {
+.group:hover .underline-expand,
+.group-hover-active .underline-expand {
   width: var(--target-width, 100%);
+  opacity: 1;
 }
 
-.play-icon {
-  pointer-events: none;
+.group-hover-active .play-icon {
+  opacity: 1;
+}
+
+.group-hover-active {
+  cursor: pointer;
 }
