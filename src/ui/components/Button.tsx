@@ -13,11 +13,10 @@ export class Button extends Component<ButtonProps> {
     const { onClick, children, size } = this.props;
     return (
       <button
-        className={"relative cursor-pointer rounded-full box-border flex items-center justify-center" +
-          (this.props.defaultBackground ?? true
+        type="button"
+        className={`relative cursor-pointer rounded-full box-border flex items-center justify-center${this.props.defaultBackground ?? true
             ? " bg-neutral-900 hover:bg-neutral-700"
-            : "") +
-          (this.props.className ? ` ${this.props.className}` : "")}
+            : ""}${this.props.className ? ` ${this.props.className}` : ""}`}
         style={{ width: `${size ?? 32}px`, height: `${size ?? 32}px` }}
         onClick={onClick}
       >

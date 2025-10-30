@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { Signal, signal } from "@preact/signals";
+import { type Signal, signal } from "@preact/signals";
 import { SidebarComponent } from "./components/SidebarComponent";
 import styleContent from "./style.css" with { type: "css" };
 import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
@@ -18,7 +18,7 @@ interface AppProps {
   autoScrolling: Signal<boolean>;
   autoScrollingDirection: Signal<"up" | "down">;
   segmentHoverIndex: Signal<number>;
-  segmentHoverElement: Signal<HTMLElement | null>;
+  segmentHoverRange: Signal<Range | null>;
   onPlayPauseClick: () => void;
   onSegmentHoverPlayClick: (index: number) => void;
   onEnableAutoScrollingClick: () => void;
@@ -40,7 +40,7 @@ const App = (props: AppProps) => {
       <SegmentHoverPlayButton
         onPlayClick={props.onSegmentHoverPlayClick}
         segmentHoverIndex={props.segmentHoverIndex}
-        segmentHoverElement={props.segmentHoverElement}
+        segmentHoverRange={props.segmentHoverRange}
       />
     </>
   );
@@ -54,7 +54,7 @@ interface Options {
   autoScrolling: boolean;
   autoScrollingDirection: "up" | "down";
   segmentHoverIndex: number;
-  segmentHoverElement: HTMLElement | null;
+  segmentHoverRange: Range | null;
   onPlayPauseClick: () => void;
   onSegmentHoverPlayClick: (index: number) => void;
   onEnableAutoScrollingClick: () => void;
@@ -74,7 +74,7 @@ export function setupUi(options: Options) {
   const autoScrollingSignal = signal(options.autoScrolling);
   const autoScrollingDirectionSignal = signal(options.autoScrollingDirection);
   const segmentHoverIndexSignal = signal(options.segmentHoverIndex);
-  const segmentHoverElementSignal = signal(options.segmentHoverElement);
+  const segmentHoverRangeSignal = signal(options.segmentHoverRange);
 
   render(
     <App
@@ -85,7 +85,7 @@ export function setupUi(options: Options) {
       autoScrolling={autoScrollingSignal}
       autoScrollingDirection={autoScrollingDirectionSignal}
       segmentHoverIndex={segmentHoverIndexSignal}
-      segmentHoverElement={segmentHoverElementSignal}
+      segmentHoverRange={segmentHoverRangeSignal}
       onPlayPauseClick={options.onPlayPauseClick}
       onSegmentHoverPlayClick={options.onSegmentHoverPlayClick}
       onEnableAutoScrollingClick={options.onEnableAutoScrollingClick}
@@ -112,9 +112,9 @@ export function setupUi(options: Options) {
     setAutoScrollingDirection: (direction: "up" | "down") => {
       autoScrollingDirectionSignal.value = direction;
     },
-    setSegmentHover: (index: number, element: HTMLElement | null) => {
+    setSegmentHover: (index: number, range: Range | null) => {
       segmentHoverIndexSignal.value = index;
-      segmentHoverElementSignal.value = element;
+      segmentHoverRangeSignal.value = range;
     },
   };
 }

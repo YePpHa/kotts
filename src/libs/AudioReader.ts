@@ -1,5 +1,5 @@
 import type { IRange } from "../types/IRange";
-import { IStreamingMedia } from "../types/IStreamingMedia";
+import type { IStreamingMedia } from "../types/IStreamingMedia";
 import { concatBuffers } from "../utils/Buffer";
 
 export type StreamData = {

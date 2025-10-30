@@ -4,9 +4,11 @@ import { ScrollingService } from "./ScrollingService";
 export class HighligherService {
   public onHighlightChange = new EventEmitter<() => void>();
 
-  private _restoreMap = new Map<Node, Node[]>();
-
   private _autoScrolling = true;
+
+  private _scrollingService = new ScrollingService();
+
+  private _highlightContainer: HTMLElement | null = null;
 
   private _scrollingId = 0;
   public scrolling = false;
@@ -19,38 +21,14 @@ export class HighligherService {
     return this._autoScrolling;
   }
 
-  private _getSplitRange(range: Range): Range[] {
-    const originalTextNode = range.startContainer;
-
-    const split = this._restoreMap.get(originalTextNode);
-    if (split === undefined) {
-      return [range];
+  private _getHighlightContainer(): HTMLElement {
+    if (this._highlightContainer === null) {
+      this._highlightContainer = document.createElement("div");
+      this._highlightContainer.classList.add("kokotts-highlight-container");
+      document.body.appendChild(this._highlightContainer);
     }
 
-    const ranges = [];
-    let currentIndex = 0;
-    for (const textNode of split) {
-      const textLength = (textNode.textContent ?? "").length;
-      const newRange = document.createRange();
-
-      const start = Math.min(
-        Math.max(range.startOffset - currentIndex, 0),
-        textLength,
-      );
-      const end = Math.max(
-        Math.min(range.endOffset - currentIndex, textLength),
-        0,
-      );
-
-      newRange.setStart(textNode, start);
-      newRange.setEnd(textNode, end);
-
-      ranges.push(newRange);
-      currentIndex += textLength;
-    }
-
-    return ranges
-      .filter((range) => !range.collapsed);
+    return this._highlightContainer;
   }
 
   public highlightBrowserRange(range: Range, prevRect?: DOMRect): void {
@@ -61,40 +39,21 @@ export class HighligherService {
       return;
     }
 
-    const originalTextNode = range.startContainer;
+    const container = this._getHighlightContainer();
+    const highlightElements: HTMLElement[] = [];
 
-    let highlightElements: HTMLElement[] = [];
-
-    const ranges = this._getSplitRange(range);
-    for (const range of ranges) {
-      const subTextNode = range.startContainer as ChildNode;
-      const textContent = subTextNode.textContent ?? "";
-      const parts: Node[] = [
-        textContent.slice(0, range.startOffset),
-        textContent.slice(range.startOffset, range.endOffset),
-        textContent.slice(range.endOffset),
-      ]
-        .map((part) => document.createTextNode(part));
-
-      const allSubNodes = this._restoreMap.get(originalTextNode);
-      if (allSubNodes === undefined) {
-        this._restoreMap.set(originalTextNode, parts);
-      } else {
-        const index = allSubNodes.indexOf(subTextNode);
-        allSubNodes.splice(index, 1, ...parts);
-      }
-
-      const highlightTextNode = parts[1];
-      const wrapperNode = document.createElement("span");
+    const rects = Array.from(range.getClientRects());
+    for (const rect of rects) {
+      const wrapperNode = document.createElement("div");
       wrapperNode.classList.add("kokotts-highlight");
-      wrapperNode.appendChild(highlightTextNode);
-      parts[1] = wrapperNode;
-
-      subTextNode.replaceWith(...parts);
+      wrapperNode.style.left = `${Math.round(rect.left + (document.scrollingElement?.scrollLeft ?? 0))}px`;
+      wrapperNode.style.top = `${Math.round(rect.top + (document.scrollingElement?.scrollTop ?? 0))}px`;
+      wrapperNode.style.width = `${rect.width}px`;
+      wrapperNode.style.height = `${rect.height}px`;
+      container.appendChild(wrapperNode);
 
       if (prevRect !== undefined) {
-        const rect = wrapperNode.getBoundingClientRect();
-        if (rect.top === prevRect.top) {
+        if (Math.abs(rect.top - prevRect.top) < rect.height/2) {
           const diff = prevRect.left - rect.left;
           wrapperNode.style.setProperty("--animate-from-left", `${diff}px`);
           wrapperNode.style.setProperty(
@@ -124,7 +83,7 @@ export class HighligherService {
     const scrollingId = ++this._scrollingId;
     try {
       this.scrolling = true;
-      await ScrollingService.scrollIntoView(element, {
+      await this._scrollingService.scrollIntoView(element, {
         behavior: "smooth",
         block: "center",
       });
@@ -136,18 +95,10 @@ export class HighligherService {
   }
 
   public clear() {
-    for (const [textNode, subNodes] of this._restoreMap) {
-      const range = new Range();
-      range.setStart(subNodes[0], 0);
-      range.setEnd(
-        subNodes[subNodes.length - 1],
-        (subNodes[subNodes.length - 1].textContent ?? "").length,
-      );
-
-      range.deleteContents();
-      range.insertNode(textNode);
+    if (this._highlightContainer !== null) {
+      for (const child of Array.from(this._highlightContainer.children)) {
+        this._highlightContainer.removeChild(child);
+      }
     }
-
-    this._restoreMap.clear();
   }
 }

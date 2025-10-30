@@ -9,15 +9,20 @@ export async function writeManifest() {
     "description": pckg.description,
     "permissions": [],
     "host_permissions": [
-      "http://127.0.0.1:8880/*"
+      "http://127.0.0.1:8880/*",
     ],
     "content_scripts": [
       {
-        "matches": ["https://www.royalroad.com/fiction/*", "https://www.scribblehub.com/read/*", "https://www.fanfiction.net/s/*"],
+        "matches": [
+          "https://www.royalroad.com/fiction/*",
+          "https://www.scribblehub.com/read/*",
+          "https://www.fanfiction.net/s/*",
+          "https://www.lightnovelworld.co/novel/*",
+        ],
         "js": ["content_script.js"],
-        "world": "MAIN"
-      }
-    ]
+        "world": "MAIN",
+      },
+    ],
   };
 
   fs.writeFileSync("./dist/manifest.json", JSON.stringify(manifest, null, 2));

@@ -1,4 +1,4 @@
-import { AudioReader, StreamChapter, StreamData } from "../libs/AudioReader";
+import { AudioReader, type StreamChapter, type StreamData } from "../libs/AudioReader";
 import { EventEmitter } from "../libs/EventEmitter";
 import { StreamingAudio } from "../libs/StreamingAudio";
 import type { ITTSApiService, TTSResponse } from "../types/ITTSApiService";
@@ -14,7 +14,7 @@ export class AudioService {
 
   private _audioReader: AudioReader;
   private _chapters: StreamChapter[] = [];
-  private _completed: boolean = false;
+  private _completed = false;
 
   private _ttsApiService: ITTSApiService;
   private _ttsResponses: TTSResponse[] = [];
@@ -64,6 +64,7 @@ export class AudioService {
     texts: Iterable<string, void, void> | AsyncIterable<string, void, void>,
   ): AsyncIterable<StreamData, void, void> {
     for await (const text of texts) {
+      // biome-ignore lint/suspicious/noConfusingLabels: <explanation>
       a: {
         let lastError = null;
         for (let i = 0; i < RETRY; i++) {

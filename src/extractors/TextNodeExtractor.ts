@@ -1,8 +1,8 @@
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
+import type { ITextRange } from "../types/ITextRange";
 import {
   findNearestNonInlineElement,
   getCommonAncestor,
-  isElementNode,
   isTextNode,
 } from "../utils/Node";
 
@@ -13,11 +13,27 @@ export class TextNodeExtractor implements ITextExtractor {
     this._selector = selector;
   }
 
-  extractText(): TextSegment[] {
+  private _getTotalTextNodes(node: Node): number {
+    const walker = document.createTreeWalker(
+      node,
+      NodeFilter.SHOW_TEXT,
+    );
+
+    let totalTextNodes = 0;
+    while (walker.nextNode() !== null) {
+      totalTextNodes++;
+    }
+
+    return totalTextNodes;
+  }
+
+  public extractText(): TextSegment[] {
     const chapterContent = document.querySelector<HTMLElement>(this._selector);
     if (!chapterContent) {
       throw new Error("Chapter content not found");
     }
+
+    const highlightContainer = document.querySelector(".kokotts-highlight-container");
 
     const walker = document.createTreeWalker(
       chapterContent,
@@ -31,6 +47,10 @@ export class TextNodeExtractor implements ITextExtractor {
       if (!isTextNode(walker.currentNode)) {
         continue;
       }
+      if (highlightContainer?.contains(walker.currentNode)) {
+        continue;
+      }
+
       textNodes.push(walker.currentNode);
     }
 
@@ -51,7 +71,11 @@ export class TextNodeExtractor implements ITextExtractor {
       }
 
       const prevNode = textNodes[i - 1];
-      if (!this._isTextInSameParagraph(prevNode, textNode)) {
+      if (
+        !this._isTextInSameParagraph(prevNode, textNode) ||
+        prevNode.nextElementSibling &&
+          prevNode.nextElementSibling.tagName === "BR"
+      ) {
         texts.push([]);
       }
       texts[texts.length - 1].push(textNode);
@@ -77,19 +101,74 @@ export class TextNodeExtractor implements ITextExtractor {
         commonAncestor = cm;
       }
       if (isTextNode(commonAncestor) && commonAncestor.parentElement !== null) {
-        commonAncestor = commonAncestor.parentElement;
-      }
-      if (!isElementNode(commonAncestor)) {
-        throw new Error("Common ancestor is not an element");
+        const totalTextNodes = this._getTotalTextNodes(
+          commonAncestor.parentElement,
+        );
+
+        if (totalTextNodes === textNodes.length) {
+          commonAncestor = commonAncestor.parentElement;
+        }
       }
 
-      segments.push({
-        texts: textNodes,
-        container: commonAncestor,
-      });
+      let texts: ITextRange[] = [];
+      for (const text of textNodes) {
+        const str = text.textContent ?? "";
+        const regex = /(\r?\n){2,}/g;
+        let m: RegExpExecArray | null = null;
+        let start = 0;
+        // biome-ignore lint/suspicious/noAssignInExpressions: best way to do it
+        while ((m = regex.exec(str)) !== null) {
+          // This is necessary to avoid infinite loops with zero-width matches
+          if (m.index === regex.lastIndex) {
+            regex.lastIndex++;
+          }
+
+          const end = m.index;
+          if (end > start) {
+            if (this._isTextAllowed(str.substring(start, end))) {
+              texts.push({ start, end, text });
+            }
+
+            if (texts.length > 0) {
+              segments.push({
+                texts,
+                container: commonAncestor,
+              });
+              texts = [];
+            }
+          }
+          start = regex.lastIndex;
+        }
+
+        if (start < str.length) {
+          if (this._isTextAllowed(str.substring(start))) {
+            texts.push({ start, end: str.length, text });
+          }
+        }
+      }
+
+      if (texts.length > 0) {
+        segments.push({
+          texts,
+          container: commonAncestor,
+        });
+      }
     }
 
+    console.log(segments);
+
     return segments;
+  }
+
+  private _isTextAllowed(text: string): boolean {
+    const trimmed = text.trim();
+    if (trimmed.length === 0) {
+      return false;
+    }
+
+    // Check if the text contains at least one letter or number
+    const regex = /[\p{LC}\p{Ll}\p{Lm}\p{Lo}\p{Lt}\p{Lu}0-9]/u;
+    return regex.test(trimmed);
   }
 
   private _isTextInSameParagraph(text1: Text, text2: Text): boolean {

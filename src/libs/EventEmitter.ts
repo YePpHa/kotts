@@ -1,3 +1,4 @@
+// biome-ignore lint/suspicious/noExplicitAny: use of any is necessary here
 export class EventEmitter<T extends (...args: any[]) => void> {
   private _listeners = new Set<T>();
 
@@ -10,7 +11,7 @@ export class EventEmitter<T extends (...args: any[]) => void> {
   }
 
   public emit(...args: Parameters<T>): void {
-    const listeners = Array.from(this._listeners);
+    const listeners = Array.from(this._listeners.values());
     for (const listener of listeners) {
       listener(...args);
     }

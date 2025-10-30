@@ -1,5 +1,5 @@
 export class ScrollingService {
-  public static scrollIntoView(
+  public scrollIntoView(
     element: HTMLElement,
     options?: ScrollIntoViewOptions,
   ): Promise<void> {

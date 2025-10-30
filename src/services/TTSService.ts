@@ -1,8 +1,9 @@
 import { EventEmitter } from "../libs/EventEmitter";
 import { BufferingState, PlaybackState } from "../libs/MediaController";
-import { StreamingAudio } from "../libs/StreamingAudio";
-import { IRange } from "../types/IRange";
+import type { StreamingAudio } from "../libs/StreamingAudio";
+import type { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
+import { ITextRange } from "../types/ITextRange";
 import type { ITTSApiService } from "../types/ITTSApiService";
 import { throttle } from "../utils/Timings";
 import { AudioService } from "./AudioService";
@@ -13,7 +14,7 @@ export class TTSService {
     (result: { direction: "up" | "down"; enabled: boolean }) => void
   >();
   public readonly onSegmentHighlight = new EventEmitter<
-    (segmentIndex: number, segmentElement: HTMLElement | null) => void
+    (segmentIndex: number, segment: Range) => void
   >();
   public readonly onBufferingStateChange = new EventEmitter<
     (state: BufferingState) => void
@@ -40,7 +41,13 @@ export class TTSService {
     this._segments = this._textExtractor.extractText();
 
     const texts = this._segments.map(
-      (x) => x.texts.map((y) => y.textContent).join(""),
+      (x) =>
+        x.texts.map((y) =>
+          y.text.textContent?.substring(y.start, y.end).replace(
+            /\n|\r/g,
+            " ",
+          ) ?? ""
+        ).join(""),
     );
 
     this._audioService = new AudioService(ttsApiService, texts);
@@ -94,6 +101,35 @@ export class TTSService {
     return this.audio.getBufferingState();
   }
 
+  private _findSegmentForTextIndex(textIndex: number): number | null {
+    let offset = 0;
+    for (let i = 0; i < this._segments.length; i++) {
+      const segment = this._segments[i];
+      for (let i = 0; i < segment.texts.length; i++) {
+        const text = segment.texts[i];
+        const textLength = text.end - text.start;
+
+        if (offset + textLength < textIndex) {
+          offset += textLength;
+          continue;
+        }
+        return i;
+      }
+    }
+
+    return null;
+  }
+
+  public playFromTextIndex(textIndex: number): void {
+    const segmentIndex = this._findSegmentForTextIndex(textIndex);
+    if (segmentIndex === null) {
+      console.warn("No segment found for text index", textIndex);
+      return;
+    }
+
+    this.playSegment(segmentIndex);
+  }
+
   public playSegment(index: number): void {
     if (index < 0 || index >= this._segments.length) {
       return;
@@ -142,7 +178,7 @@ export class TTSService {
     this._handleScroll();
   }
 
-  private _handleScroll(forceOff: boolean = false) {
+  private _handleScroll(forceOff = false) {
     if (
       this._highlighter.scrolling && !forceOff ||
       this._audioService.audio.getPlaybackState() !== PlaybackState.Play
@@ -275,7 +311,7 @@ export class TTSService {
     let offset = 0;
     for (let i = 0; i < segment.texts.length; i++) {
       const text = segment.texts[i];
-      const textLength = text.textContent?.length ?? 0;
+      const textLength = text.end - text.start;
 
       if (offset + textLength <= range.start) {
         offset += textLength;
@@ -283,13 +319,13 @@ export class TTSService {
       }
 
       if (startContainer === null) {
-        startContainer = text;
-        startOffset = range.start - offset;
+        startContainer = text.text;
+        startOffset = range.start - offset + text.start;
       }
 
       if (offset + textLength >= range.end) {
-        endContainer = text;
-        endOffset = range.end - offset;
+        endContainer = text.text;
+        endOffset = range.end - offset + text.start;
         break;
       }
 
@@ -354,42 +390,50 @@ export class TTSService {
     return -1;
   }
 
-  private _handleMouseMove = throttle((evt: MouseEvent): void => {
-    const element = evt.target;
-    if (element === null || !(element instanceof Node)) {
-      return;
+  private _findTextSegmentIndexAtPosition(x: number, y: number): number | null {
+    const pos = document.caretPositionFromPoint(x, y);
+    if (pos === null) {
+      return null;
     }
 
-    const segmentIndex = this._getSegmentIndexAtElement(element);
-    if (segmentIndex === -1) {
-      return;
+    const node = pos.offsetNode;
+    const offset = pos.offset;
+    if (node === null || node.nodeType !== Node.TEXT_NODE) {
+      return null;
     }
 
-    const { container } = this._segments[segmentIndex];
-    this.onSegmentHighlight.emit(segmentIndex, container);
-  }, 33);
-
-  private _getSegmentIndexAtElement(element: Node): number {
-    let focusedIndex = -1;
     for (let i = 0; i < this._segments.length; i++) {
       const segment = this._segments[i];
-      const firstContainer = segment.container;
-      if (element.contains(firstContainer)) {
-        if (focusedIndex !== -1) {
-          return -1;
+      for (let j = 0; j < segment.texts.length; j++) {
+        const text = segment.texts[j];
+        if (text.text !== node) {
+          continue;
         }
 
-        focusedIndex = i;
-        if (i === this._segments.length - 1) {
-          return focusedIndex;
+        if (offset < text.start || offset >= text.end) {
+          continue;
         }
-        continue;
-      }
 
-      if (focusedIndex !== -1) {
-        return focusedIndex;
+        return i;
       }
     }
-    return -1;
+
+    return null;
   }
+
+  private _handleMouseMove = throttle((evt: MouseEvent): void => {
+    const textSegmentIndex = this._findTextSegmentIndexAtPosition(evt.x, evt.y);
+    if (textSegmentIndex === null) {
+      return;
+    }
+
+    const range = document.createRange();
+    const segment = this._segments[textSegmentIndex];
+    const firstText = segment.texts[0];
+    const lastText = segment.texts[segment.texts.length - 1];
+    range.setStart(firstText.text, firstText.start);
+    range.setEnd(lastText.text, lastText.end);
+
+    this.onSegmentHighlight.emit(textSegmentIndex, range);
+  }, 33);
 }

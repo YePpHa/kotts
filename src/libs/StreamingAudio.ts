@@ -59,9 +59,9 @@ export class StreamingAudio {
   public readonly onSeeking = new EventEmitter<(time: number) => void>();
 
   private _chunks: AudioChunk[] = [];
-  private _duration: number = 0; // sum of chunk durations
-  private _currentTime: number = 0; // global playback position
-  private _ended: boolean = false; // whether we've called .end()
+  private _duration = 0; // sum of chunk durations
+  private _currentTime = 0; // global playback position
+  private _ended = false; // whether we've called .end()
 
   // The top-level "preferred" state for the entire timeline:
   private _preferredPlaybackState: PlaybackState = PlaybackState.Pause;
@@ -69,7 +69,7 @@ export class StreamingAudio {
   private _bufferingState: BufferingState = BufferingState.Ready;
 
   // Index of whichever chunk is currently active (-1 if none)
-  private _currentChunkIndex: number = -1;
+  private _currentChunkIndex = -1;
 
   private _offlineContext = new OfflineAudioContext(2, 2, 44100);
 
@@ -287,7 +287,7 @@ export class StreamingAudio {
    * we initialize a MediaController if needed and set the correct local offset.
    */
   private async _selectChunkForCurrentTime(
-    force: boolean = false,
+    force = false,
   ): Promise<void> {
     const idx = this._findChunkIndexForTime(this._currentTime);
     if (idx === this._currentChunkIndex && !force) {

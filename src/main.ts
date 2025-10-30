@@ -15,9 +15,13 @@ function getTextExtractor(): ITextExtractor {
   const url = window.location.href;
   if (url.startsWith("https://www.royalroad.com/")) {
     return new RoyalRoadTextExtractor();
-  } else if (url.startsWith("https://www.scribblehub.com/")) {
+  }
+  
+  if (url.startsWith("https://www.scribblehub.com/")) {
     return new ScribbleHubTextExtractor();
-  } else if (url.startsWith("https://www.fanfiction.net/")) {
+  }
+
+  if (url.startsWith("https://www.fanfiction.net/")) {
     return new FanFictionTextExtractor();
   }
 
@@ -47,7 +51,7 @@ const {
   duration: ttsService.audio.duration,
   autoScrolling: ttsService.isAutoScrolling(),
   autoScrollingDirection: "up",
-  segmentHoverElement: null,
+  segmentHoverRange: null,
   segmentHoverIndex: -1,
   onEnableAutoScrollingClick: () => {
     ttsService.setAutoScrolling(true);
@@ -86,6 +90,6 @@ ttsService.onAutoScrollingChange.add(({ enabled, direction }) => {
   setAutoScrollingDirection(direction);
 });
 
-ttsService.onSegmentHighlight.add((index, element) => {
-  setSegmentHover(index, element);
+ttsService.onSegmentHighlight.add((index, segment) => {
+  setSegmentHover(index, segment);
 });

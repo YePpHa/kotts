@@ -52,7 +52,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
             strokeWidth={2}
             onClick={onPlayPauseClick}
           />
-          <div className="border-b-2 border-neutral-700 w-[32px]"></div>
+          <div className="border-b-2 border-neutral-700 w-[32px]" />
           <Button onClick={() => {}}>
             <User size={18} color="#ffffff" strokeWidth={2} />
           </Button>

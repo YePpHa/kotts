@@ -1,4 +1,4 @@
-import { Circle, CircleDashed, LoaderCircle, Pause, Play } from "lucide-preact";
+import { Circle, CircleDashed, Pause, Play } from "lucide-preact";
 import { Component } from "preact";
 import { Button } from "./Button";
 
@@ -21,7 +21,7 @@ export class PlayButtonComponent extends Component<ButtonProps> {
 
     const dashArray = 2 * Math.PI * RADIUS;
     const dashOffset = Number.isFinite(progress)
-      ? dashArray - (dashArray * progress)
+      ? dashArray - (dashArray * Math.min(progress, 1))
       : dashArray;
 
     const scale = size / (RADIUS * 2);

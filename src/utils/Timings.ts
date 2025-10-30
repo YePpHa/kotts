@@ -1,11 +1,12 @@
+// biome-ignore lint/suspicious/noExplicitAny: neccessary for the implementation
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
-  wait: number = 200,
+  wait = 200,
 ) {
   let lastCallTime: number | null = null;
   let timeout: ReturnType<typeof setTimeout> | null = null;
 
-  return function (...args: any[]) {
+  return (...args: unknown[]) => {
     const now = Date.now();
 
     if (timeout !== null) {

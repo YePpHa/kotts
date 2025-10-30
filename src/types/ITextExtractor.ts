@@ -1,6 +1,8 @@
+import type { ITextRange } from "./ITextRange";
+
 export interface TextSegment {
-  texts: Text[];
-  container: HTMLElement;
+  texts: ITextRange[];
+  container: Node;
 }
 
 export interface ITextExtractor {

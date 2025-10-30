@@ -1,11 +1,11 @@
 import { Component } from "preact";
 import { Button } from "./Button";
 import { Play } from "lucide-preact";
-import { computed, Signal } from "@preact/signals";
+import { computed, type Signal } from "@preact/signals";
 
 interface SegmentPlayButtonProps {
   segmentHoverIndex: Signal<number>;
-  segmentHoverElement: Signal<HTMLElement | null>;
+  segmentHoverRange: Signal<Range | null>;
   onPlayClick: (index: number) => void;
 }
 
@@ -13,40 +13,54 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
   public render() {
     const {
       segmentHoverIndex,
-      segmentHoverElement,
+      segmentHoverRange,
       onPlayClick,
     } = this.props;
 
     const lineHeight = computed(() => {
-      const value = segmentHoverElement.value;
+      const value = segmentHoverRange.value;
       if (value === null) {
         return null;
       }
-      const lineHeight = window.getComputedStyle(value, null).getPropertyValue(
+      const container = value.commonAncestorContainer instanceof Text ? value.commonAncestorContainer.parentElement : value.commonAncestorContainer;
+      if (!container || !(container instanceof HTMLElement)) {
+        return null;
+      }
+
+      const computedStyle = window.getComputedStyle(container, null);
+
+      const lineHeight = computedStyle.getPropertyValue(
         "line-height",
       );
       const num = Number.parseFloat(lineHeight);
       if (Number.isNaN(num)) {
-        return null;
+        const fallbackLineHeight = computedStyle.getPropertyValue("font-size");
+        return fallbackLineHeight ? Number.parseFloat(fallbackLineHeight) : null;
       }
 
       return num;
     });
 
     const rect = computed(() => {
-      const value = segmentHoverElement.value;
+      const range = segmentHoverRange.value;
+      if (range === null) {
+        return null;
+      }
+      return range.getBoundingClientRect();
+    });
+
+    const parentRect = computed(() => {
+      const value = segmentHoverRange.value;
       if (value === null) {
         return null;
       }
-      return value.getBoundingClientRect();
-    });
-    const parentRect = computed(() => {
-      const value = segmentHoverElement.value?.parentElement;
-      if (!value) {
+      const container = value.commonAncestorContainer instanceof Text ? value.commonAncestorContainer.parentElement : value.commonAncestorContainer;
+      if (!container || !(container instanceof HTMLElement)) {
         return null;
       }
-      return value.getBoundingClientRect();
+      return container.getBoundingClientRect();
     });
+
     if (
       rect.value === null || parentRect.value === null ||
       lineHeight.value === null

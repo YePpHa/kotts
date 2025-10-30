@@ -39,6 +39,8 @@ export class KokoroTTSApiService implements ITTSApiService {
     text: string,
     options: Partial<TTSOptions> = {},
   ): Promise<TTSResponse> {
+    const normText = text.replace(/\b[\p{Lu}\p{Lt}]+\b/gu, (match) => match.toLowerCase());
+
     const response = await fetch(`${this._apiURL}/dev/captioned_speech`, {
       method: "POST",
       headers: {
@@ -48,7 +50,7 @@ export class KokoroTTSApiService implements ITTSApiService {
 
       body: JSON.stringify({
         "model": "kokoro",
-        "input": text,
+        "input": normText,
         "voice": this._voice,
         "speed": this._speed,
         "lang_code": this._langCode,
@@ -59,7 +61,7 @@ export class KokoroTTSApiService implements ITTSApiService {
     });
 
     const wordTimestamps = await this._getWordTimestamps(
-      text,
+      normText,
       response.headers,
     );
 
