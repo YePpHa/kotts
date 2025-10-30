@@ -1,7 +1,6 @@
 import { Component } from "preact";
-import { Button } from "./Button";
-import { Play } from "lucide-preact";
 import { computed, type Signal } from "@preact/signals";
+import { Play } from "lucide-preact";
 
 interface SegmentPlayButtonProps {
   segmentHoverIndex: Signal<number>;
@@ -10,6 +9,29 @@ interface SegmentPlayButtonProps {
 }
 
 export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
+  private _firstCharsRange = computed(() => {
+    const range = this.props.segmentHoverRange.value;
+    if (range === null) {
+      return null;
+    }
+
+    // Create a new range for the first few characters (about 3-5 characters)
+    const textContent = range.toString();
+    const charCount = Math.min(5, textContent.length);
+    
+    if (charCount === 0) {
+      return null;
+    }
+
+    const firstCharsRange = range.cloneRange();
+    firstCharsRange.setEnd(firstCharsRange.startContainer, Math.min(
+      firstCharsRange.startOffset + charCount,
+      firstCharsRange.startContainer.textContent?.length ?? 0
+    ));
+
+    return firstCharsRange;
+  });
+
   public render() {
     const {
       segmentHoverIndex,
@@ -17,77 +39,66 @@ export class SegmentHoverPlayButton extends Component<SegmentPlayButtonProps> {
       onPlayClick,
     } = this.props;
 
-    const lineHeight = computed(() => {
-      const value = segmentHoverRange.value;
-      if (value === null) {
+    const firstCharsRange = this._firstCharsRange.value;
+
+    const firstCharsRect = computed(() => {
+      if (firstCharsRange === null) {
         return null;
       }
-      const container = value.commonAncestorContainer instanceof Text ? value.commonAncestorContainer.parentElement : value.commonAncestorContainer;
-      if (!container || !(container instanceof HTMLElement)) {
-        return null;
-      }
-
-      const computedStyle = window.getComputedStyle(container, null);
-
-      const lineHeight = computedStyle.getPropertyValue(
-        "line-height",
-      );
-      const num = Number.parseFloat(lineHeight);
-      if (Number.isNaN(num)) {
-        const fallbackLineHeight = computedStyle.getPropertyValue("font-size");
-        return fallbackLineHeight ? Number.parseFloat(fallbackLineHeight) : null;
-      }
-
-      return num;
+      return firstCharsRange.getBoundingClientRect();
     });
 
-    const rect = computed(() => {
-      const range = segmentHoverRange.value;
-      if (range === null) {
-        return null;
-      }
-      return range.getBoundingClientRect();
-    });
-
-    const parentRect = computed(() => {
-      const value = segmentHoverRange.value;
-      if (value === null) {
-        return null;
-      }
-      const container = value.commonAncestorContainer instanceof Text ? value.commonAncestorContainer.parentElement : value.commonAncestorContainer;
-      if (!container || !(container instanceof HTMLElement)) {
-        return null;
-      }
-      return container.getBoundingClientRect();
-    });
-
-    if (
-      rect.value === null || parentRect.value === null ||
-      lineHeight.value === null
-    ) {
+    if (firstCharsRect.value === null || firstCharsRange === null) {
       return null;
     }
 
-    const SIZE = 32;
-
     const scrollTop = window.scrollY;
     const scrollLeft = window.scrollX;
-    const top = rect.value.top + scrollTop + lineHeight.value / 2 - SIZE / 2;
-    // const top = rect.value.top + scrollTop;
-    const left = parentRect.value.left + scrollLeft - 48;
+    const rect = firstCharsRect.value;
+    
+    // Position the container over the first few characters
+    const top = rect.top + scrollTop;
+    const left = rect.left + scrollLeft;
+    const width = rect.width;
+    const height = rect.height;
+    
+    // Calculate play icon size based on line height (80% of line height, with min/max bounds)
+    const iconSize = Math.max(12, Math.min(20, height * 0.8));
 
     return (
-      <aside class="absolute" style={{ top: `${top}px`, left: `${left}px` }}>
-        <Button
-          onClick={() =>
-            onPlayClick(segmentHoverIndex.value)}
-          size={SIZE}
-          className="ring-sky-300 glow bg-sky-500 hover:bg-sky-400"
-          defaultBackground={false}
+      <div
+        class="group absolute cursor-pointer"
+        style={{ 
+          top: `${top}px`, 
+          left: `${left}px`,
+          width: `${width}px`,
+          height: `${height}px`,
+          pointerEvents: 'auto',
+        }}
+        onClick={() => onPlayClick(segmentHoverIndex.value)}
+      >
+        {/* Animated underline */}
+        <div
+          class="underline-expand absolute bottom-0 left-0 h-0.5 bg-sky-500 opacity-0 group-hover:opacity-100"
+          style={{
+            '--target-width': `${width}px`,
+            maskImage: 'linear-gradient(to right, black 0%, black 70%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to right, black 0%, black 70%, transparent 100%)',
+          }}
+        />
+        {/* Play icon */}
+        <div 
+          class="play-icon absolute opacity-0 group-hover:opacity-100 transition-opacity duration-150 ease-out"
+          style={{
+            right: '100%',
+            marginRight: '6px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+          }}
         >
-          <Play fill="#ffffff" strokeWidth={0} width={18} height={18} />
-        </Button>
-      </aside>
+          <Play fill="#0ea5e9" strokeWidth={0} width={iconSize} height={iconSize} />
+        </div>
+      </div>
     );
   }
 }

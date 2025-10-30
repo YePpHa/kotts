@@ -39,3 +39,17 @@
     transform: translateY(0);
   }
 }
+
+.underline-expand {
+  width: 0;
+  transform-origin: left center;
+  transition: width 0.15s ease-out, opacity 0.15s ease-out;
+}
+
+.group:hover .underline-expand {
+  width: var(--target-width, 100%);
+}
+
+.play-icon {
+  pointer-events: none;
+}
