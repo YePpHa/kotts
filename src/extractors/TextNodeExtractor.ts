@@ -1,10 +1,6 @@
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
 import type { ITextRange } from "../types/ITextRange";
-import {
-  findNearestNonInlineElement,
-  getCommonAncestor,
-  isTextNode,
-} from "../utils/Node";
+import { findNearestNonInlineElement, getCommonAncestor, isTextNode } from "../utils/Node";
 
 export class TextNodeExtractor implements ITextExtractor {
   private _selector: string;
@@ -14,10 +10,7 @@ export class TextNodeExtractor implements ITextExtractor {
   }
 
   private _getTotalTextNodes(node: Node): number {
-    const walker = document.createTreeWalker(
-      node,
-      NodeFilter.SHOW_TEXT,
-    );
+    const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
 
     let totalTextNodes = 0;
     while (walker.nextNode() !== null) {
@@ -35,10 +28,7 @@ export class TextNodeExtractor implements ITextExtractor {
 
     const highlightContainer = document.querySelector(".kokotts-highlight-container");
 
-    const walker = document.createTreeWalker(
-      chapterContent,
-      NodeFilter.SHOW_TEXT,
-    );
+    const walker = document.createTreeWalker(chapterContent, NodeFilter.SHOW_TEXT);
 
     // Get all text nodes in order
 
@@ -58,10 +48,7 @@ export class TextNodeExtractor implements ITextExtractor {
     const texts: Text[][] = [];
     for (let i = 0; i < textNodes.length; i++) {
       const textNode = textNodes[i];
-      if (
-        textNode.parentElement === null ||
-        textNode.parentElement.offsetParent === null
-      ) {
+      if (textNode.parentElement === null || textNode.parentElement.offsetParent === null) {
         continue;
       }
 
@@ -73,8 +60,7 @@ export class TextNodeExtractor implements ITextExtractor {
       const prevNode = textNodes[i - 1];
       if (
         !this._isTextInSameParagraph(prevNode, textNode) ||
-        prevNode.nextElementSibling &&
-          prevNode.nextElementSibling.tagName === "BR"
+        (prevNode.nextElementSibling && prevNode.nextElementSibling.tagName === "BR")
       ) {
         texts.push([]);
       }
@@ -101,9 +87,7 @@ export class TextNodeExtractor implements ITextExtractor {
         commonAncestor = cm;
       }
       if (isTextNode(commonAncestor) && commonAncestor.parentElement !== null) {
-        const totalTextNodes = this._getTotalTextNodes(
-          commonAncestor.parentElement,
-        );
+        const totalTextNodes = this._getTotalTextNodes(commonAncestor.parentElement);
 
         if (totalTextNodes === textNodes.length) {
           commonAncestor = commonAncestor.parentElement;

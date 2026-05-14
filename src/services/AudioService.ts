@@ -15,6 +15,7 @@ export class AudioService {
   private _audioReader: AudioReader;
   private _chapters: StreamChapter[] = [];
   private _completed = false;
+  private _started = false;
 
   private _ttsApiService: ITTSApiService;
   private _ttsResponses: TTSResponse[] = [];
@@ -28,11 +29,26 @@ export class AudioService {
     this._ttsApiService = ttsApiService;
 
     this._audioReader = new AudioReader(this._createStreams(texts));
-    this._load();
   }
 
   public [Symbol.dispose]() {
     this._abortController.abort();
+  }
+
+  /**
+   * Start synthesizing/loading audio. This is intentionally lazy so we don't
+   * begin calling the TTS API until the user explicitly presses play.
+   */
+  public start(): void {
+    if (this._started) {
+      return;
+    }
+    this._started = true;
+    void this._load();
+  }
+
+  public get started(): boolean {
+    return this._started;
   }
 
   private async _load() {
@@ -64,12 +80,21 @@ export class AudioService {
     texts: Iterable<string, void, void> | AsyncIterable<string, void, void>,
   ): AsyncIterable<StreamData, void, void> {
     for await (const text of texts) {
+      const normalizedText = text
+        .replace(/’/g, "'")
+        .replace(/“/g, '"')
+        .replace(/”/g, '"')
+        .replace(/\[/g, ",")
+        .replace(/\]/g, ",")
+        .replace(/\(/g, ",")
+        .replace(/\)/g, ",");
+
       // biome-ignore lint/suspicious/noConfusingLabels: <explanation>
       a: {
         let lastError = null;
         for (let i = 0; i < RETRY; i++) {
           try {
-            const ttsResponse = await this._ttsApiService.createSpeech(text, {
+            const ttsResponse = await this._ttsApiService.createSpeech(normalizedText, {
               signal: this._abortController.signal,
             });
             this._ttsResponses.push(ttsResponse);
@@ -80,10 +105,7 @@ export class AudioService {
             break a;
           } catch (err) {
             lastError = err;
-            console.warn(
-              { error: err },
-              `Failed to create speech. Retrying ${i + 1}/${RETRY}...`,
-            );
+            console.warn({ error: err }, `Failed to create speech. Retrying ${i + 1}/${RETRY}...`);
           }
         }
 

@@ -2,7 +2,7 @@ import type { IRange } from "./IRange";
 
 export interface TTSResponse {
   text: string;
-  content: ReadableStream<Uint8Array>;
+  content: ReadableStream<Uint8Array<ArrayBuffer>>;
   contentType: string;
   wordTimestamps: WordTimestamp[];
 }
@@ -17,8 +17,5 @@ export interface TTSOptions {
 }
 
 export interface ITTSApiService {
-  createSpeech(
-    text: string,
-    options?: Partial<TTSOptions>,
-  ): Promise<TTSResponse>;
+  createSpeech(text: string, options?: Partial<TTSOptions>): Promise<TTSResponse>;
 }

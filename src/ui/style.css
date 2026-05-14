@@ -43,7 +43,9 @@
 .underline-expand {
   width: 0;
   transform-origin: left center;
-  transition: width 0.15s ease-out, opacity 0.15s ease-out;
+  transition:
+    width 0.15s ease-out,
+    opacity 0.15s ease-out;
 }
 
 .group:hover .underline-expand,

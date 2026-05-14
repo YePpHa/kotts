@@ -9,11 +9,7 @@
  */
 
 import { EventEmitter } from "./EventEmitter";
-import {
-  BufferingState,
-  MediaController,
-  PlaybackState,
-} from "./MediaController";
+import { BufferingState, MediaController, PlaybackState } from "./MediaController";
 
 /**
  * Definition of a chunk of audio in the streaming timeline.
@@ -23,7 +19,7 @@ export interface AudioChunk {
   type: string;
 
   /** Binary data for this chunk. */
-  data: Uint8Array;
+  data: Uint8Array<ArrayBuffer>;
 
   /**
    * Start time (seconds) in the overall timeline where this chunk will begin.
@@ -44,16 +40,10 @@ export interface AudioChunk {
 
 export class StreamingAudio {
   // --- Public event emitters ---
-  public readonly onStateChange = new EventEmitter<
-    (state: PlaybackState) => void
-  >();
-  public readonly onBufferingStateChange = new EventEmitter<
-    (state: BufferingState) => void
-  >();
+  public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
+  public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
-  public readonly onDurationChange = new EventEmitter<
-    (duration: number) => void
-  >();
+  public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
   public readonly onBufferAppended = new EventEmitter<() => void>();
   public readonly onBufferEnd = new EventEmitter<() => void>();
   public readonly onSeeking = new EventEmitter<(time: number) => void>();
@@ -132,7 +122,7 @@ export class StreamingAudio {
    * Append a chunk of audio data. We decode with OfflineAudioContext
    * to find out how long the chunk is, then push it onto the timeline.
    */
-  public async next(type: string, data: Uint8Array): Promise<void> {
+  public async next(type: string, data: Uint8Array<ArrayBuffer>): Promise<void> {
     const chunkDuration = await this._decodeAudioDuration(type, data);
 
     const start = this._duration;
@@ -226,17 +216,9 @@ export class StreamingAudio {
   /**
    * Offline decode to determine chunk duration.
    */
-  private async _decodeAudioDuration(
-    type: string,
-    data: Uint8Array,
-  ): Promise<number> {
-    const arrayBuffer = data.buffer.slice(
-      data.byteOffset,
-      data.byteOffset + data.byteLength,
-    );
-    const audioBuffer = await this._offlineContext.decodeAudioData(
-      arrayBuffer as ArrayBuffer,
-    );
+  private async _decodeAudioDuration(type: string, data: Uint8Array): Promise<number> {
+    const arrayBuffer = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    const audioBuffer = await this._offlineContext.decodeAudioData(arrayBuffer as ArrayBuffer);
     return audioBuffer.duration;
   }
 
@@ -286,9 +268,7 @@ export class StreamingAudio {
    * Picks the chunk covering _currentTime (if any). If we change chunks,
    * we initialize a MediaController if needed and set the correct local offset.
    */
-  private async _selectChunkForCurrentTime(
-    force = false,
-  ): Promise<void> {
+  private async _selectChunkForCurrentTime(force = false): Promise<void> {
     const idx = this._findChunkIndexForTime(this._currentTime);
     if (idx === this._currentChunkIndex && !force) {
       return;
@@ -385,10 +365,8 @@ export class StreamingAudio {
 
       // If chunk ended => check if we have next chunk
       if (state === PlaybackState.Ended) {
-        this._onChunkEnded(idx);
-      } else if (
-        state === PlaybackState.Play || state === PlaybackState.Pause
-      ) {
+        void this._onChunkEnded(idx);
+      } else if (state === PlaybackState.Play || state === PlaybackState.Pause) {
         // If the chunk spontaneously paused but we prefer play, or vice versa,
         // the MediaController will keep trying to enforce local preference.
         // But *our* streaming audio is the top-level boss.
@@ -445,6 +423,10 @@ export class StreamingAudio {
         this.setPlaybackState(PlaybackState.Ended);
       } else {
         // Otherwise, we are "waiting for more data" => buffering
+        this._currentTime = this._chunks[chunkIndex].end;
+        this.onTimeUpdate.emit(this._currentTime);
+        this._currentChunkIndex = -1;
+
         this._emitBufferingState(BufferingState.Buffering);
       }
     }

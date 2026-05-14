@@ -3,11 +3,10 @@ import { BufferingState, PlaybackState } from "../libs/MediaController";
 import type { StreamingAudio } from "../libs/StreamingAudio";
 import type { IRange } from "../types/IRange";
 import type { ITextExtractor, TextSegment } from "../types/ITextExtractor";
-import { ITextRange } from "../types/ITextRange";
 import type { ITTSApiService } from "../types/ITTSApiService";
 import { throttle } from "../utils/Timings";
 import { AudioService } from "./AudioService";
-import { HighligherService } from "./HighlighterService";
+import { HighlighterService } from "./HighlighterService";
 
 export class TTSService {
   public readonly onAutoScrollingChange = new EventEmitter<
@@ -16,9 +15,7 @@ export class TTSService {
   public readonly onSegmentHighlight = new EventEmitter<
     (segmentIndex: number, segment: Range) => void
   >();
-  public readonly onBufferingStateChange = new EventEmitter<
-    (state: BufferingState) => void
-  >();
+  public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
 
   private _abortController = new AbortController();
 
@@ -26,13 +23,14 @@ export class TTSService {
   private _textExtractor: ITextExtractor;
 
   private _segments: TextSegment[];
-  private _highlighter = new HighligherService();
+  private _highlighter = new HighlighterService();
   private _lastHighlightedWord: {
     streamIndex: number;
     textRange: IRange;
     startTime: number;
   } | null = null;
   private _lastScrollDirection: "up" | "down" = "up";
+  private _currentRange: Range | null = null;
 
   private _playSegmentIndex = -1;
 
@@ -40,14 +38,10 @@ export class TTSService {
     this._textExtractor = textExtractor;
     this._segments = this._textExtractor.extractText();
 
-    const texts = this._segments.map(
-      (x) =>
-        x.texts.map((y) =>
-          y.text.textContent?.substring(y.start, y.end).replace(
-            /\n|\r/g,
-            " ",
-          ) ?? ""
-        ).join(""),
+    const texts = this._segments.map((x) =>
+      x.texts
+        .map((y) => y.text.textContent?.substring(y.start, y.end).replace(/\n|\r/g, " ") ?? "")
+        .join(""),
     );
 
     this._audioService = new AudioService(ttsApiService, texts);
@@ -61,27 +55,44 @@ export class TTSService {
       signal: this._abortController.signal,
     });
 
-    document.addEventListener(
-      "mousemove",
-      (evt) => this._handleMouseMove(evt),
-      {
-        signal: this._abortController.signal,
-      },
-    );
+    document.addEventListener("mousemove", (evt) => this._handleMouseMove(evt), {
+      signal: this._abortController.signal,
+    });
 
     this.audio.onStateChange.add((state) => this._onStateChange(state));
-    this.audio.onBufferingStateChange.add((state) =>
-      this.onBufferingStateChange.emit(state)
-    );
+    this.audio.onBufferingStateChange.add((state) => this.onBufferingStateChange.emit(state));
     this._audioService.onSegmentLoad.add(() => this._onBufferAppended());
     this._audioService.onSegmentEnd.add(() => this._onBufferEnd());
-    this._highlighter.onHighlightChange.add(() =>
-      this._handleHighlightChange()
-    );
+    this._highlighter.onHighlightChange.add(() => this._handleHighlightChange());
   }
 
   public get audio(): StreamingAudio {
     return this._audioService.audio;
+  }
+
+  /**
+   * Ensure the AudioService has begun loading/synthesizing.
+   * This is needed because audio loading is intentionally lazy until first play.
+   */
+  public ensureStarted(): void {
+    this._audioService.start();
+  }
+
+  public play(): void {
+    this.ensureStarted();
+    void this.audio.play();
+  }
+
+  public pause(): void {
+    this.audio.pause();
+  }
+
+  public togglePlayPause(): void {
+    if (this.audio.getPlaybackState() === PlaybackState.Play) {
+      this.pause();
+    } else {
+      this.play();
+    }
   }
 
   public [Symbol.dispose]() {
@@ -131,6 +142,8 @@ export class TTSService {
   }
 
   public playSegment(index: number): void {
+    this.ensureStarted();
+
     if (index < 0 || index >= this._segments.length) {
       return;
     }
@@ -152,18 +165,16 @@ export class TTSService {
     const chapter = chapters[index];
     this.audio.currentTime = chapter.timeRange.start;
 
-    this.audio.play();
+    this.play();
   }
 
   public setAutoScrolling(enabled: boolean): void {
     this._highlighter.setAutoScrolling(enabled);
 
     if (enabled) {
-      const currentHighlight = document.querySelector<HTMLElement>(
-        ".kokotts-highlight",
-      );
-      if (currentHighlight) {
-        this._highlighter.scrollIntoView(currentHighlight);
+      const currentRange = this._currentRange;
+      if (currentRange) {
+        void this._highlighter.scrollIntoView(currentRange);
       }
     }
 
@@ -180,16 +191,14 @@ export class TTSService {
 
   private _handleScroll(forceOff = false) {
     if (
-      this._highlighter.scrolling && !forceOff ||
+      (this._highlighter.scrolling && !forceOff) ||
       this._audioService.audio.getPlaybackState() !== PlaybackState.Play
     ) {
       return;
     }
 
     let direction: "up" | "down" = "up";
-    const currentHighlight = document.querySelector<HTMLElement>(
-      ".kokotts-highlight",
-    );
+    const currentHighlight = document.querySelector<HTMLElement>(".kokotts-highlight");
     if (currentHighlight) {
       const rect = currentHighlight.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
@@ -227,7 +236,7 @@ export class TTSService {
     const chapter = chapters[segmentIndex];
     this.audio.currentTime = chapter.timeRange.start;
 
-    this.audio.play();
+    this.play();
   }
 
   private _onBufferEnd(): void {
@@ -243,6 +252,7 @@ export class TTSService {
   private _onStateChange(state: PlaybackState): void {
     if (state === PlaybackState.Ended) {
       this._highlighter.clear();
+      this._currentRange = null;
     }
 
     if (state === PlaybackState.Play) {
@@ -271,10 +281,7 @@ export class TTSService {
       return;
     }
 
-    const range = this._getSegmentBrowserRange(
-      word.streamIndex,
-      word.textRange,
-    );
+    const range = this._getSegmentBrowserRange(word.streamIndex, word.textRange);
     if (range === null) {
       return;
     }
@@ -295,12 +302,10 @@ export class TTSService {
 
     this._highlighter.clear();
     this._highlighter.highlightBrowserRange(range, rect);
+    this._currentRange = range.cloneRange();
   }
 
-  private _getSegmentBrowserRange(
-    segmentIndex: number,
-    range: IRange,
-  ): Range | null {
+  private _getSegmentBrowserRange(segmentIndex: number, range: IRange): Range | null {
     const segment = this._segments[segmentIndex];
 
     let startContainer: Text | null = null;

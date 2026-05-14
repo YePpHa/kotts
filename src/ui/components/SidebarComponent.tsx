@@ -1,7 +1,9 @@
-import { Component } from "preact";
-import { PlayButtonComponent } from "./PlayButtonComponent";
-import { Button } from "./Button";
 import { ArrowDown, ArrowUp, AudioLines, User } from "lucide-preact";
+import { Component } from "preact";
+
+import { Button } from "./Button";
+import { PlayButtonComponent } from "./PlayButtonComponent";
+import { VoiceProfilesPopup } from "./VoiceProfilesPopup";
 
 interface SidebarComponentProps {
   onPlayPauseClick?: () => void;
@@ -15,6 +17,10 @@ interface SidebarComponentProps {
 }
 
 export class SidebarComponent extends Component<SidebarComponentProps> {
+  state = {
+    voicesOpen: false,
+  };
+
   public render() {
     const {
       onPlayPauseClick,
@@ -27,12 +33,18 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
       autoScrollingDirection,
     } = this.props;
 
-    const currentTimeString = `${
-      Math.floor(currentTime / 60).toString().padStart(2, "0")
-    }:${Math.floor(currentTime % 60).toString().padStart(2, "0")}`;
+    const currentTimeString = `${Math.floor(currentTime / 60)
+      .toString()
+      .padStart(2, "0")}:${Math.floor(currentTime % 60)
+      .toString()
+      .padStart(2, "0")}`;
 
     return (
       <aside class="fixed right-4 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
+        <VoiceProfilesPopup
+          open={this.state.voicesOpen}
+          onClose={() => this.setState({ voicesOpen: false })}
+        />
         {!autoScrolling && isPlaying && autoScrollingDirection === "up" && (
           <div class="absolute -top-[48px] bg-neutral-900 rounded-full mb-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-top-slide-in z-0">
             <Button size={40} onClick={onEnableAutoScrollingClick} className="">
@@ -41,9 +53,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
           </div>
         )}
         <div class="bg-neutral-900 rounded-2xl p-2 ring-sky-300 glow w-[48px] flex flex-col items-center space-y-4 z-10">
-          <span class="text-white">
-            {currentTimeString}
-          </span>
+          <span class="text-white">{currentTimeString}</span>
           <PlayButtonComponent
             isPlaying={isPlaying}
             buffering={buffering}
@@ -56,7 +66,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
           <Button onClick={() => {}}>
             <User size={18} color="#ffffff" strokeWidth={2} />
           </Button>
-          <Button onClick={() => {}}>
+          <Button onClick={() => this.setState({ voicesOpen: true })}>
             <AudioLines size={18} color="#ffffff" strokeWidth={2} />
           </Button>
         </div>

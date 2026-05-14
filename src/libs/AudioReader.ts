@@ -4,7 +4,7 @@ import { concatBuffers } from "../utils/Buffer";
 
 export type StreamData = {
   type: string;
-  stream: ReadableStream<Uint8Array>;
+  stream: ReadableStream<Uint8Array<ArrayBuffer>>;
 };
 
 export interface StreamChapter {
@@ -18,14 +18,12 @@ export class AudioReader {
     this._streams = streams;
   }
 
-  public async *load(
-    audio: IStreamingMedia,
-  ): AsyncGenerator<StreamChapter, void, void> {
+  public async *load(audio: IStreamingMedia): AsyncGenerator<StreamChapter, void, void> {
     for await (const { type, stream } of this._streams) {
       const start = audio.duration;
 
       const reader = stream.getReader();
-      const buffers: Uint8Array[] = [];
+      const buffers: Uint8Array<ArrayBuffer>[] = [];
       while (true) {
         const { done, value } = await reader.read();
         if (done) {

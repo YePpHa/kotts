@@ -1,7 +1,7 @@
 import { EventEmitter } from "../libs/EventEmitter";
 import { ScrollingService } from "./ScrollingService";
 
-export class HighligherService {
+export class HighlighterService {
   public onHighlightChange = new EventEmitter<() => void>();
 
   private _autoScrolling = true;
@@ -9,6 +9,8 @@ export class HighligherService {
   private _scrollingService = new ScrollingService();
 
   private _highlightContainer: HTMLElement | null = null;
+
+  private _currentRange: Range | null = null;
 
   private _scrollingId = 0;
   public scrolling = false;
@@ -53,13 +55,10 @@ export class HighligherService {
       container.appendChild(wrapperNode);
 
       if (prevRect !== undefined) {
-        if (Math.abs(rect.top - prevRect.top) < rect.height/2) {
+        if (Math.abs(rect.top - prevRect.top) < rect.height / 2) {
           const diff = prevRect.left - rect.left;
           wrapperNode.style.setProperty("--animate-from-left", `${diff}px`);
-          wrapperNode.style.setProperty(
-            "--animate-from-width",
-            `${prevRect.width}px`,
-          );
+          wrapperNode.style.setProperty("--animate-from-width", `${prevRect.width}px`);
           wrapperNode.classList.add("kokotts-highlight--animate");
           window.requestAnimationFrame(() => {
             wrapperNode.style.removeProperty("--animate-from-left");
@@ -72,18 +71,20 @@ export class HighligherService {
       highlightElements.push(wrapperNode);
     }
 
-    const firstHighlight = highlightElements.at(0);
-    if (this._autoScrolling && firstHighlight) {
-      this.scrollIntoView(firstHighlight);
+    // Store the current range for scrolling
+    this._currentRange = range.cloneRange();
+
+    if (this._autoScrolling) {
+      void this.scrollIntoView(range);
     }
     this.onHighlightChange.emit();
   }
 
-  public async scrollIntoView(element: HTMLElement): Promise<void> {
+  public async scrollIntoView(range: Range): Promise<void> {
     const scrollingId = ++this._scrollingId;
     try {
       this.scrolling = true;
-      await this._scrollingService.scrollIntoView(element, {
+      await this._scrollingService.scrollIntoView(range, {
         behavior: "smooth",
         block: "center",
       });

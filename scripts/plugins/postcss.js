@@ -1,6 +1,7 @@
+import fs from "node:fs/promises";
+
 import postcss from "postcss";
 import postcssrc from "postcss-load-config";
-import fs from "node:fs/promises";
 
 export default {
   name: "postcss",

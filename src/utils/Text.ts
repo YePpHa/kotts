@@ -1,17 +1,10 @@
 import diff, { DELETE, EQUAL, INSERT } from "fast-diff";
+
 import type { IRange } from "../types/IRange";
 
-export function firstMatch(
-  needle: string,
-  haystack: string,
-  initialOffset: number,
-): IRange | null {
+export function firstMatch(needle: string, haystack: string, initialOffset: number): IRange | null {
   let offset = initialOffset;
-  for (
-    let i = Math.min(offset + needle.length, haystack.length);
-    i <= haystack.length;
-    i++
-  ) {
+  for (let i = Math.min(offset + needle.length, haystack.length); i <= haystack.length; i++) {
     const matches = diff(haystack.slice(offset, i), needle, 0, false);
     if (i + 1 <= haystack.length && matches.length > 0) {
       if (matches[matches.length - 1][0] === INSERT) {

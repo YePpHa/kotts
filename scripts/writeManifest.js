@@ -1,26 +1,24 @@
 import fs from "node:fs";
+
 import pckg from "../package.json" with { type: "json" };
 
 export async function writeManifest() {
   const manifest = {
-    "manifest_version": 3,
-    "name": pckg.name,
-    "version": pckg.version,
-    "description": pckg.description,
-    "permissions": [],
-    "host_permissions": [
-      "http://127.0.0.1:8880/*",
-    ],
-    "content_scripts": [
+    manifest_version: 3,
+    name: pckg.name,
+    version: pckg.version,
+    description: pckg.description,
+    permissions: ["storage"],
+    host_permissions: ["http://127.0.0.1:8880/*", "http://127.0.0.1:8000/*"],
+    content_scripts: [
       {
-        "matches": [
+        matches: [
           "https://www.royalroad.com/fiction/*",
           "https://www.scribblehub.com/read/*",
           "https://www.fanfiction.net/s/*",
-          "https://www.lightnovelworld.co/novel/*",
         ],
-        "js": ["content_script.js"],
-        "world": "MAIN",
+        js: ["content_script.js"],
+        world: "MAIN",
       },
     ],
   };

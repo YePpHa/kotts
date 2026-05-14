@@ -26,17 +26,11 @@ export enum BufferingState {
 }
 
 export class MediaController<T extends HTMLMediaElement> {
-  public readonly onStateChange = new EventEmitter<
-    (state: PlaybackState) => void
-  >();
-  public readonly onBufferingStateChange = new EventEmitter<
-    (state: BufferingState) => void
-  >();
+  public readonly onStateChange = new EventEmitter<(state: PlaybackState) => void>();
+  public readonly onBufferingStateChange = new EventEmitter<(state: BufferingState) => void>();
   public readonly onTimeUpdate = new EventEmitter<(time: number) => void>();
   public readonly onSeeking = new EventEmitter<(time: number) => void>();
-  public readonly onDurationChange = new EventEmitter<
-    (duration: number) => void
-  >();
+  public readonly onDurationChange = new EventEmitter<(duration: number) => void>();
 
   public readonly media: T;
 
@@ -55,11 +49,9 @@ export class MediaController<T extends HTMLMediaElement> {
     media.addEventListener("stalled", () => this._onStalled(), { signal });
     media.addEventListener("suspend", () => this._onStalled(), { signal });
     media.addEventListener("waiting", () => this._onStalled(), { signal });
-    media.addEventListener(
-      "seeking",
-      () => this.onSeeking.emit(this.media.currentTime),
-      { signal },
-    );
+    media.addEventListener("seeking", () => this.onSeeking.emit(this.media.currentTime), {
+      signal,
+    });
     media.addEventListener("seeked", () => this._onCanplay(), { signal });
     media.addEventListener("timeupdate", () => this._onTimeUpdate(), {
       signal,
@@ -109,7 +101,9 @@ export class MediaController<T extends HTMLMediaElement> {
 
     try {
       if (
-        !this.media.paused && !this.media.ended && this.media.currentTime > 0 &&
+        !this.media.paused &&
+        !this.media.ended &&
+        this.media.currentTime > 0 &&
         this.media.readyState > HTMLMediaElement.HAVE_CURRENT_DATA
       ) {
         return;
@@ -191,9 +185,7 @@ export class MediaController<T extends HTMLMediaElement> {
     this._emitBufferingState();
 
     // If we prefer to play, ensure we are playing
-    if (
-      this._preferredPlaybackState === PlaybackState.Play && this.media.paused
-    ) {
+    if (this._preferredPlaybackState === PlaybackState.Play && this.media.paused) {
       void this.play();
     } else if (this._preferredPlaybackState === PlaybackState.Pause) {
       this.media.pause();
@@ -220,9 +212,7 @@ export class MediaController<T extends HTMLMediaElement> {
   }
 
   private _emitBufferingState(): void {
-    const state = this.isBuffering()
-      ? BufferingState.Buffering
-      : BufferingState.Ready;
+    const state = this.isBuffering() ? BufferingState.Buffering : BufferingState.Ready;
     this.onBufferingStateChange.emit(state);
   }
 }

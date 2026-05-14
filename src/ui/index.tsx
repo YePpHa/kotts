@@ -1,8 +1,9 @@
-import { render } from "preact";
 import { type Signal, signal } from "@preact/signals";
+import { render } from "preact";
+
+import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
 import { SidebarComponent } from "./components/SidebarComponent";
 import styleContent from "./style.css" with { type: "css" };
-import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
 
 function createStylesheet(content: string) {
   const style = new CSSStyleSheet();
