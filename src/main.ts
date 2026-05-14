@@ -4,6 +4,7 @@ import { ScribbleHubTextExtractor } from "./extractors/ScribbleHubTextExtractor"
 import { BufferingState, PlaybackState } from "./libs/MediaController";
 import { createTTSApiService } from "./services/tts/createTTSApiService";
 import { TTSService } from "./services/TTSService";
+import type { VoiceProfile } from "./services/VoiceProfilesService";
 import { VoiceProfilesService } from "./services/VoiceProfilesService";
 import { injectStyle } from "./style";
 import type { ITextExtractor } from "./types/ITextExtractor";
@@ -32,13 +33,10 @@ function getTextExtractor(): ITextExtractor {
 async function start() {
   const voiceSettings = await VoiceProfilesService.load();
   const activeProfile = VoiceProfilesService.getActiveProfile(voiceSettings);
-  if (activeProfile === null) {
-    return;
-  }
+
+  let ttsService: TTSService | null = null;
 
   const textExtractor = getTextExtractor();
-  const ttsApiService = createTTSApiService(activeProfile);
-  const ttsService = new TTSService(ttsApiService, textExtractor);
 
   const {
     setPlaying,
@@ -48,51 +46,72 @@ async function start() {
     setAutoScrolling,
     setAutoScrollingDirection,
     setSegmentHover,
+    setHasActiveProfile,
   } = setupUi({
-    isPlaying: ttsService.audio.getPlaybackState() === PlaybackState.Play,
-    buffering: ttsService.getBufferingState() === BufferingState.Buffering,
-    currentTime: ttsService.audio.currentTime,
-    duration: ttsService.audio.duration,
-    autoScrolling: ttsService.isAutoScrolling(),
+    isPlaying: false,
+    buffering: false,
+    currentTime: 0,
+    duration: 0,
+    hasActiveProfile: activeProfile !== null,
+    autoScrolling: false,
     autoScrollingDirection: "up",
     segmentHoverRange: null,
     segmentHoverIndex: -1,
     onEnableAutoScrollingClick: () => {
-      ttsService.setAutoScrolling(true);
+      ttsService?.setAutoScrolling(true);
     },
     onPlayPauseClick: () => {
-      ttsService.togglePlayPause();
+      ttsService?.togglePlayPause();
     },
     onSegmentHoverPlayClick: (index) => {
       setSegmentHover(-1, null);
-      ttsService.playSegment(index);
+      ttsService?.playSegment(index);
+    },
+    onProfileChanged: (profile: VoiceProfile | null) => {
+      initializeTTS(profile);
     },
   });
 
-  ttsService.audio.onStateChange.add((state) => {
-    setPlaying(state === PlaybackState.Play);
-  });
+  function initializeTTS(profile: VoiceProfile | null) {
+    if (ttsService) {
+      ttsService[Symbol.dispose]();
+      ttsService = null;
+    }
 
-  ttsService.audio.onTimeUpdate.add((currentTime) => {
-    setCurrentTime(currentTime);
-  });
+    setHasActiveProfile(profile !== null);
 
-  ttsService.audio.onDurationChange.add((duration) => {
-    setDuration(duration);
-  });
+    if (profile) {
+      const ttsApiService = createTTSApiService(profile);
+      ttsService = new TTSService(ttsApiService, textExtractor);
 
-  ttsService.onBufferingStateChange.add((state) => {
-    setBuffering(state === BufferingState.Buffering);
-  });
+      ttsService.audio.onStateChange.add((state) => {
+        setPlaying(state === PlaybackState.Play);
+      });
 
-  ttsService.onAutoScrollingChange.add(({ enabled, direction }) => {
-    setAutoScrolling(enabled);
-    setAutoScrollingDirection(direction);
-  });
+      ttsService.audio.onTimeUpdate.add((currentTime) => {
+        setCurrentTime(currentTime);
+      });
 
-  ttsService.onSegmentHighlight.add((index, segment) => {
-    setSegmentHover(index, segment);
-  });
+      ttsService.audio.onDurationChange.add((duration) => {
+        setDuration(duration);
+      });
+
+      ttsService.onBufferingStateChange.add((state) => {
+        setBuffering(state === BufferingState.Buffering);
+      });
+
+      ttsService.onAutoScrollingChange.add(({ enabled, direction }) => {
+        setAutoScrolling(enabled);
+        setAutoScrollingDirection(direction);
+      });
+
+      ttsService.onSegmentHighlight.add((index, segment) => {
+        setSegmentHover(index, segment);
+      });
+    }
+  }
+
+  initializeTTS(activeProfile);
 }
 
 void start();

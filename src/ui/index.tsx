@@ -1,6 +1,7 @@
 import { type Signal, signal } from "@preact/signals";
 import { render } from "preact";
 
+import type { VoiceProfile } from "../services/VoiceProfilesService";
 import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
 import { SidebarComponent } from "./components/SidebarComponent";
 import styleContent from "./style.css" with { type: "css" };
@@ -20,9 +21,11 @@ interface AppProps {
   autoScrollingDirection: Signal<"up" | "down">;
   segmentHoverIndex: Signal<number>;
   segmentHoverRange: Signal<Range | null>;
+  hasActiveProfile: Signal<boolean>;
   onPlayPauseClick: () => void;
   onSegmentHoverPlayClick: (index: number) => void;
   onEnableAutoScrollingClick: () => void;
+  onProfileChanged?: (profile: VoiceProfile | null) => void;
 }
 
 const App = (props: AppProps) => {
@@ -35,8 +38,10 @@ const App = (props: AppProps) => {
         duration={props.duration.value}
         autoScrolling={props.autoScrolling.value}
         autoScrollingDirection={props.autoScrollingDirection.value}
+        hasActiveProfile={props.hasActiveProfile.value}
         onPlayPauseClick={props.onPlayPauseClick}
         onEnableAutoScrollingClick={props.onEnableAutoScrollingClick}
+        onProfileChanged={props.onProfileChanged}
       />
       <SegmentHoverPlayButton
         onPlayClick={props.onSegmentHoverPlayClick}
@@ -56,9 +61,11 @@ interface Options {
   autoScrollingDirection: "up" | "down";
   segmentHoverIndex: number;
   segmentHoverRange: Range | null;
+  hasActiveProfile: boolean;
   onPlayPauseClick: () => void;
   onSegmentHoverPlayClick: (index: number) => void;
   onEnableAutoScrollingClick: () => void;
+  onProfileChanged?: (profile: VoiceProfile | null) => void;
 }
 
 export function setupUi(options: Options) {
@@ -76,6 +83,7 @@ export function setupUi(options: Options) {
   const autoScrollingDirectionSignal = signal(options.autoScrollingDirection);
   const segmentHoverIndexSignal = signal(options.segmentHoverIndex);
   const segmentHoverRangeSignal = signal(options.segmentHoverRange);
+  const hasActiveProfileSignal = signal(options.hasActiveProfile);
 
   render(
     <App
@@ -87,9 +95,11 @@ export function setupUi(options: Options) {
       autoScrollingDirection={autoScrollingDirectionSignal}
       segmentHoverIndex={segmentHoverIndexSignal}
       segmentHoverRange={segmentHoverRangeSignal}
+      hasActiveProfile={hasActiveProfileSignal}
       onPlayPauseClick={options.onPlayPauseClick}
       onSegmentHoverPlayClick={options.onSegmentHoverPlayClick}
       onEnableAutoScrollingClick={options.onEnableAutoScrollingClick}
+      onProfileChanged={options.onProfileChanged}
     />,
     shadowRoot,
   );
@@ -116,6 +126,9 @@ export function setupUi(options: Options) {
     setSegmentHover: (index: number, range: Range | null) => {
       segmentHoverIndexSignal.value = index;
       segmentHoverRangeSignal.value = range;
+    },
+    setHasActiveProfile: (active: boolean) => {
+      hasActiveProfileSignal.value = active;
     },
   };
 }

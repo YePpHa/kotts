@@ -2,7 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 
 import { KokoroTTSApiService } from "../../services/tts/KokoroTTSApiService";
 import { OpenAITTSApiService } from "../../services/tts/OpenAITTSApiService";
-import { type TTSBackendType, VoiceProfilesService } from "../../services/VoiceProfilesService";
+import {
+  type TTSBackendType,
+  type VoiceProfile,
+  VoiceProfilesService,
+} from "../../services/VoiceProfilesService";
 
 type DiscoveryState =
   | { status: "idle" }
@@ -13,13 +17,18 @@ type DiscoveryState =
 interface VoiceProfilesPopupProps {
   open: boolean;
   onClose: () => void;
+  onProfileChanged?: (profile: VoiceProfile | null) => void;
 }
 
 function normalizeHost(host: string): string {
   return host.trim().replace(/\/+$/, "");
 }
 
-export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) => {
+export const VoiceProfilesPopup = ({
+  open,
+  onClose,
+  onProfileChanged,
+}: VoiceProfilesPopupProps) => {
   const [settings, setSettings] = useState(() => VoiceProfilesService.defaultSettings());
 
   const activeProfile = useMemo(() => VoiceProfilesService.getActiveProfile(settings), [settings]);
@@ -49,7 +58,6 @@ export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) =
   const [voice, setVoice] = useState<string>("");
   const [_voiceAudio, setVoiceAudio] = useState<string>("");
   const [_voiceAudioFilename, setVoiceAudioFilename] = useState<string>("");
-  const [needsReload, setNeedsReload] = useState<boolean>(false);
 
   const refreshSettings = async () => setSettings(await VoiceProfilesService.load());
 
@@ -62,7 +70,6 @@ export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) =
       const loaded = await VoiceProfilesService.load();
       if (cancelled) return;
       setSettings(loaded);
-      setNeedsReload(false);
 
       // Prime the form from the active profile.
       const active = VoiceProfilesService.getActiveProfile(loaded);
@@ -168,7 +175,6 @@ export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) =
     );
     await VoiceProfilesService.save(next);
     setSettings(next);
-    setNeedsReload(true);
     setName("");
   };
 
@@ -176,14 +182,14 @@ export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) =
     const next = VoiceProfilesService.setActiveProfile(profileId, settings);
     await VoiceProfilesService.save(next);
     setSettings(next);
-    setNeedsReload(true);
+    onProfileChanged?.(VoiceProfilesService.getActiveProfile(next));
   };
 
   const remove = async (profileId: string) => {
     const next = VoiceProfilesService.removeProfile(profileId, settings);
     await VoiceProfilesService.save(next);
     setSettings(next);
-    setNeedsReload(true);
+    onProfileChanged?.(VoiceProfilesService.getActiveProfile(next));
   };
 
   if (!open) {
@@ -413,15 +419,6 @@ export const VoiceProfilesPopup = ({ open, onClose }: VoiceProfilesPopupProps) =
               >
                 Reload list
               </button>
-              {needsReload && (
-                <button
-                  type="button"
-                  class="text-xs px-2 py-1 rounded-md bg-amber-500/20 border border-amber-400/50 hover:bg-amber-500/30"
-                  onClick={() => location.reload()}
-                >
-                  Reload page to apply
-                </button>
-              )}
             </div>
           </div>
         </div>

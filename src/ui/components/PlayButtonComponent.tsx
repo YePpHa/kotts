@@ -10,11 +10,12 @@ interface ButtonProps {
   isPlaying: boolean;
   buffering: boolean;
   progress: number;
+  disabled?: boolean;
 }
 
 export class PlayButtonComponent extends Component<ButtonProps> {
   render() {
-    const { onClick, isPlaying, progress, size, strokeWidth, buffering } = this.props;
+    const { onClick, isPlaying, progress, size, strokeWidth, buffering, disabled } = this.props;
 
     const RADIUS = 10;
     const VIEWBOX_SIZE = 24;
@@ -30,42 +31,44 @@ export class PlayButtonComponent extends Component<ButtonProps> {
     const inset = (VIEWBOX_SIZE - size) / 2;
 
     return (
-      <Button onClick={onClick} size={size}>
-        <div className="absolute left-0 top-0 bottom-0 right-0 flex items-center justify-center">
-          <Circle
-            className="absolute text-neutral-700 z-0"
-            style={{ inset: `-${inset}px` }}
-            size={newSize}
-            strokeWidth={strokeWidth}
-          />
-          {buffering ? (
-            <CircleDashed
-              className="absolute z-10 text-sky-500 animate-[spin_5s_linear_infinite]"
-              style={{ inset: `-${inset}px` }}
-              size={newSize}
-              strokeWidth={strokeWidth}
-            />
-          ) : (
+      <div className={disabled ? "opacity-40 cursor-not-allowed" : ""}>
+        <Button onClick={disabled ? undefined : onClick} size={size}>
+          <div className="absolute left-0 top-0 bottom-0 right-0 flex items-center justify-center">
             <Circle
-              className="absolute z-10 text-sky-500"
+              className="absolute text-neutral-700 z-0"
               style={{ inset: `-${inset}px` }}
-              stroke-linecap="square"
-              stroke-dashoffset={dashOffset}
-              stroke-dasharray={dashArray}
               size={newSize}
-              transform="rotate(-90 0 0)"
               strokeWidth={strokeWidth}
             />
-          )}
-        </div>
-        <div className="absolute left-0 top-0 bottom-0 right-0 flex items-center justify-center">
-          {isPlaying ? (
-            <Pause fill="#ffffff" strokeWidth={0} width={18} height={18} />
-          ) : (
-            <Play fill="#ffffff" strokeWidth={0} width={18} height={18} />
-          )}
-        </div>
-      </Button>
+            {buffering ? (
+              <CircleDashed
+                className="absolute z-10 text-sky-500 animate-[spin_5s_linear_infinite]"
+                style={{ inset: `-${inset}px` }}
+                size={newSize}
+                strokeWidth={strokeWidth}
+              />
+            ) : (
+              <Circle
+                className="absolute z-10 text-sky-500"
+                style={{ inset: `-${inset}px` }}
+                stroke-linecap="square"
+                stroke-dashoffset={dashOffset}
+                stroke-dasharray={dashArray}
+                size={newSize}
+                transform="rotate(-90 0 0)"
+                strokeWidth={strokeWidth}
+              />
+            )}
+          </div>
+          <div className="absolute left-0 top-0 bottom-0 right-0 flex items-center justify-center">
+            {isPlaying ? (
+              <Pause fill="#ffffff" strokeWidth={0} width={18} height={18} />
+            ) : (
+              <Play fill="#ffffff" strokeWidth={0} width={18} height={18} />
+            )}
+          </div>
+        </Button>
+      </div>
     );
   }
 }
