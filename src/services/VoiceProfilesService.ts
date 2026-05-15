@@ -1,26 +1,63 @@
 import { z } from "zod";
 
 import { storageGet, storageSet } from "./ExtensionStorage";
+import type { BackendType } from "./tts/backends";
 
-export type TTSBackendType = "kokoro" | "openai";
+export type TTSBackendType = BackendType;
 
-export type VoiceProfile = {
+export type TTSProvider = {
   id: string;
   name: string;
   type: TTSBackendType;
   apiURL: string;
+  authorization?: string;
+};
+
+export type SavedVoice = {
+  id: string;
+  providerId: string;
+  name: string;
   model: string;
   voice: string;
-  voiceAudio?: string;
 };
 
-export type VoiceProfilesSettings = {
-  version: 1;
-  profiles: VoiceProfile[];
-  activeProfileId: string | null;
+export type VoiceProfile = SavedVoice & {
+  type: TTSBackendType;
+  apiURL: string;
+  authorization?: string;
 };
 
-const VoiceProfileSchema = z.object({
+export type VoiceSettings = {
+  version: 2;
+  providers: TTSProvider[];
+  voices: SavedVoice[];
+  activeVoiceId: string | null;
+};
+
+const TTSProviderSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: z.union([z.literal("kokoro"), z.literal("openai")]),
+  apiURL: z.string().min(1),
+  authorization: z.string().optional(),
+});
+
+const SavedVoiceSchema = z.object({
+  id: z.string().min(1),
+  providerId: z.string().min(1),
+  name: z.string().min(1),
+  model: z.string().min(1),
+  voice: z.string(),
+});
+
+const VoiceSettingsSchema = z.object({
+  version: z.literal(2),
+  providers: z.array(TTSProviderSchema),
+  voices: z.array(SavedVoiceSchema),
+  activeVoiceId: z.string().nullable(),
+});
+
+const v1ProfileSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   type: z.union([z.literal("kokoro"), z.literal("openai")]),
@@ -30,9 +67,9 @@ const VoiceProfileSchema = z.object({
   voiceAudio: z.string().optional(),
 });
 
-const VoiceProfilesSettingsSchema = z.object({
+const v1SettingsSchema = z.object({
   version: z.literal(1),
-  profiles: z.array(VoiceProfileSchema),
+  profiles: z.array(v1ProfileSchema),
   activeProfileId: z.string().nullable(),
 });
 
@@ -44,124 +81,211 @@ function getId(): string {
     : String(Date.now()) + "-" + Math.random().toString(16).slice(2);
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values.map((v) => v.trim()).filter((v) => v.length > 0))];
-}
-
 export class VoiceProfilesService {
-  public static defaultSettings(): VoiceProfilesSettings {
-    const defaultKokoro: VoiceProfile = {
+  public static defaultSettings(): VoiceSettings {
+    const defaultKokoroProvider: TTSProvider = {
       id: getId(),
       name: "Kokoro (local)",
       type: "kokoro",
       apiURL: "http://127.0.0.1:8880",
-      model: "kokoro",
-      voice: "af_heart",
     };
 
-    const defaultOpenAI: VoiceProfile = {
+    const defaultOpenAIProvider: TTSProvider = {
       id: getId(),
       name: "OpenAI (local)",
       type: "openai",
       apiURL: "http://127.0.0.1:8000",
+    };
+
+    const kokoroVoice: SavedVoice = {
+      id: getId(),
+      providerId: defaultKokoroProvider.id,
+      name: "Kokoro (local)",
+      model: "kokoro",
+      voice: "af_heart",
+    };
+
+    const openaiVoice: SavedVoice = {
+      id: getId(),
+      providerId: defaultOpenAIProvider.id,
+      name: "OpenAI (local)",
       model: "openai",
       voice: "alloy",
     };
 
     return {
-      version: 1,
-      profiles: [defaultKokoro, defaultOpenAI],
-      activeProfileId: defaultKokoro.id,
+      version: 2,
+      providers: [defaultKokoroProvider, defaultOpenAIProvider],
+      voices: [kokoroVoice, openaiVoice],
+      activeVoiceId: kokoroVoice.id,
     };
   }
 
-  public static async load(): Promise<VoiceProfilesSettings> {
-    const defaults = VoiceProfilesService.defaultSettings();
-    const stored = await storageGet<unknown>(STORAGE_KEY, defaults);
-    const parsed = VoiceProfilesSettingsSchema.safeParse(stored);
-    if (!parsed.success) {
-      await VoiceProfilesService.save(defaults);
-      return defaults;
+  private static migrateV1ToV2(v1: z.infer<typeof v1SettingsSchema>): VoiceSettings {
+    const providerMap = new Map<string, TTSProvider>();
+
+    for (const profile of v1.profiles) {
+      const key = `${profile.type}|${profile.apiURL.trim().replace(/\/+$/, "")}`;
+      if (!providerMap.has(key)) {
+        providerMap.set(key, {
+          id: getId(),
+          name: `${profile.type.toUpperCase()} @ ${profile.apiURL}`,
+          type: profile.type,
+          apiURL: profile.apiURL.trim().replace(/\/+$/, ""),
+        });
+      }
     }
 
-    // Ensure activeProfileId points to an existing profile (or null).
-    const settings = parsed.data;
-    const activeExists =
-      settings.activeProfileId === null ||
-      settings.profiles.some((p) => p.id === settings.activeProfileId);
-    if (!activeExists) {
-      settings.activeProfileId = settings.profiles[0]?.id ?? null;
-      await VoiceProfilesService.save(settings);
-    }
+    const voices: SavedVoice[] = v1.profiles.map((profile) => {
+      const key = `${profile.type}|${profile.apiURL.trim().replace(/\/+$/, "")}`;
+      const provider = providerMap.get(key)!;
+      return {
+        id: profile.id,
+        providerId: provider.id,
+        name: profile.name,
+        model: profile.model,
+        voice: profile.voice,
+      };
+    });
 
-    return settings;
+    const activeVoiceId =
+      v1.activeProfileId && voices.some((v) => v.id === v1.activeProfileId)
+        ? v1.activeProfileId
+        : (voices[0]?.id ?? null);
+
+    return {
+      version: 2,
+      providers: [...providerMap.values()],
+      voices,
+      activeVoiceId,
+    };
   }
 
-  public static async save(settings: VoiceProfilesSettings): Promise<void> {
+  public static async load(): Promise<VoiceSettings> {
+    const defaults = VoiceProfilesService.defaultSettings();
+    const stored = await storageGet<unknown>(STORAGE_KEY, defaults);
+
+    const v2parsed = VoiceSettingsSchema.safeParse(stored);
+    if (v2parsed.success) {
+      const settings = v2parsed.data;
+      const activeExists =
+        settings.activeVoiceId === null ||
+        settings.voices.some((v) => v.id === settings.activeVoiceId);
+      if (!activeExists) {
+        settings.activeVoiceId = settings.voices[0]?.id ?? null;
+        await VoiceProfilesService.save(settings);
+      }
+      return settings;
+    }
+
+    const v1parsed = v1SettingsSchema.safeParse(stored);
+    if (v1parsed.success) {
+      const migrated = VoiceProfilesService.migrateV1ToV2(v1parsed.data);
+      await VoiceProfilesService.save(migrated);
+      return migrated;
+    }
+
+    await VoiceProfilesService.save(defaults);
+    return defaults;
+  }
+
+  public static async save(settings: VoiceSettings): Promise<void> {
     await storageSet(STORAGE_KEY, settings);
   }
 
-  public static getActiveProfile(settings: VoiceProfilesSettings): VoiceProfile | null {
-    if (settings.activeProfileId === null) {
+  public static getActiveProfile(settings: VoiceSettings): VoiceProfile | null {
+    if (settings.activeVoiceId === null) {
       return null;
     }
-    return settings.profiles.find((p) => p.id === settings.activeProfileId) ?? null;
+    const voice = settings.voices.find((v) => v.id === settings.activeVoiceId);
+    if (!voice) {
+      return null;
+    }
+    const provider = settings.providers.find((p) => p.id === voice.providerId);
+    if (!provider) {
+      return null;
+    }
+    return {
+      ...voice,
+      type: provider.type,
+      apiURL: provider.apiURL,
+      authorization: provider.authorization,
+    };
   }
 
-  public static setActiveProfile(
-    profileId: string,
-    settings: VoiceProfilesSettings,
-  ): VoiceProfilesSettings {
-    if (!settings.profiles.some((p) => p.id === profileId)) {
+  public static setActiveVoice(voiceId: string, settings: VoiceSettings): VoiceSettings {
+    if (!settings.voices.some((v) => v.id === voiceId)) {
       return settings;
     }
-    const next: VoiceProfilesSettings = { ...settings, activeProfileId: profileId };
-    return next;
+    return { ...settings, activeVoiceId: voiceId };
   }
 
-  public static removeProfile(
-    profileId: string,
-    settings: VoiceProfilesSettings,
-  ): VoiceProfilesSettings {
-    const nextProfiles = settings.profiles.filter((p) => p.id !== profileId);
+  public static removeVoice(voiceId: string, settings: VoiceSettings): VoiceSettings {
+    const nextVoices = settings.voices.filter((v) => v.id !== voiceId);
     const nextActive =
-      settings.activeProfileId === profileId
-        ? (nextProfiles[0]?.id ?? null)
-        : settings.activeProfileId;
+      settings.activeVoiceId === voiceId ? (nextVoices[0]?.id ?? null) : settings.activeVoiceId;
 
-    const next: VoiceProfilesSettings = {
+    return {
       ...settings,
-      profiles: nextProfiles,
-      activeProfileId: nextActive,
+      voices: nextVoices,
+      activeVoiceId: nextActive,
     };
-    return next;
   }
 
-  public static upsertProfile(
-    profile: Omit<VoiceProfile, "id"> & { id?: string },
-    settings: VoiceProfilesSettings,
-  ): { settings: VoiceProfilesSettings; profile: VoiceProfile } {
-    const normalized: VoiceProfile = {
-      id: profile.id ?? getId(),
-      name: profile.name.trim(),
-      type: profile.type,
-      apiURL: profile.apiURL.trim().replace(/\/+$/, ""),
-      model: profile.model.trim(),
-      voice: profile.voice.trim(),
-      ...(profile.voiceAudio !== undefined ? { voiceAudio: profile.voiceAudio } : {}),
+  public static upsertVoice(
+    voice: Omit<SavedVoice, "id"> & { id?: string },
+    settings: VoiceSettings,
+  ): { settings: VoiceSettings; voice: SavedVoice } {
+    const normalized: SavedVoice = {
+      id: voice.id ?? getId(),
+      name: voice.name.trim(),
+      providerId: voice.providerId,
+      model: voice.model.trim(),
+      voice: voice.voice.trim(),
     };
 
-    const idx = settings.profiles.findIndex((p) => p.id === normalized.id);
-    const nextProfiles =
+    const idx = settings.voices.findIndex((v) => v.id === normalized.id);
+    const nextVoices =
       idx === -1
-        ? [...settings.profiles, normalized]
-        : settings.profiles.map((p, i) => (i === idx ? normalized : p));
+        ? [...settings.voices, normalized]
+        : settings.voices.map((v, i) => (i === idx ? normalized : v));
 
-    const next: VoiceProfilesSettings = { ...settings, profiles: nextProfiles };
-    return { settings: next, profile: normalized };
+    return { settings: { ...settings, voices: nextVoices }, voice: normalized };
   }
 
-  public static getKnownHosts(type: TTSBackendType, settings: VoiceProfilesSettings): string[] {
-    return uniqueStrings(settings.profiles.filter((p) => p.type === type).map((p) => p.apiURL));
+  public static upsertProvider(
+    provider: Omit<TTSProvider, "id"> & { id?: string },
+    settings: VoiceSettings,
+  ): { settings: VoiceSettings; provider: TTSProvider } {
+    const normalized: TTSProvider = {
+      id: provider.id ?? getId(),
+      name: provider.name.trim(),
+      type: provider.type,
+      apiURL: provider.apiURL.trim().replace(/\/+$/, ""),
+      ...(provider.authorization !== undefined ? { authorization: provider.authorization } : {}),
+    };
+
+    const idx = settings.providers.findIndex((p) => p.id === normalized.id);
+    const nextProviders =
+      idx === -1
+        ? [...settings.providers, normalized]
+        : settings.providers.map((p, i) => (i === idx ? normalized : p));
+
+    return { settings: { ...settings, providers: nextProviders }, provider: normalized };
+  }
+
+  public static removeProvider(providerId: string, settings: VoiceSettings): VoiceSettings {
+    const nextProviders = settings.providers.filter((p) => p.id !== providerId);
+    const nextVoices = settings.voices.filter((v) => v.providerId !== providerId);
+    const nextActive = nextVoices.some((v) => v.id === settings.activeVoiceId)
+      ? settings.activeVoiceId
+      : (nextVoices[0]?.id ?? null);
+
+    return {
+      ...settings,
+      providers: nextProviders,
+      voices: nextVoices,
+      activeVoiceId: nextActive,
+    };
   }
 }

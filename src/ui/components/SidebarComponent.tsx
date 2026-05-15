@@ -4,7 +4,7 @@ import { Component } from "preact";
 import type { VoiceProfile } from "../../services/VoiceProfilesService";
 import { Button } from "./Button";
 import { PlayButtonComponent } from "./PlayButtonComponent";
-import { VoiceProfilesPopup } from "./VoiceProfilesPopup";
+import { VoicePickerMenu } from "./VoicePickerMenu";
 
 interface SidebarComponentProps {
   onPlayPauseClick?: () => void;
@@ -17,11 +17,12 @@ interface SidebarComponentProps {
   autoScrollingDirection: "up" | "down";
   hasActiveProfile: boolean;
   onProfileChanged?: (profile: VoiceProfile | null) => void;
+  onOpenSettings?: () => void;
 }
 
 export class SidebarComponent extends Component<SidebarComponentProps> {
   state = {
-    voicesOpen: false,
+    menuOpen: false,
   };
 
   public render() {
@@ -36,6 +37,7 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
       autoScrollingDirection,
       hasActiveProfile,
       onProfileChanged,
+      onOpenSettings,
     } = this.props;
 
     const currentTimeString = `${Math.floor(currentTime / 60)
@@ -46,11 +48,6 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
 
     return (
       <aside class="fixed right-4 top-1/2 transform -translate-y-1/2 flex flex-col items-center">
-        <VoiceProfilesPopup
-          open={this.state.voicesOpen}
-          onClose={() => this.setState({ voicesOpen: false })}
-          onProfileChanged={onProfileChanged}
-        />
         {!autoScrolling && isPlaying && autoScrollingDirection === "up" && (
           <div class="absolute -top-[48px] bg-neutral-900 rounded-full mb-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-top-slide-in z-0">
             <Button size={40} onClick={onEnableAutoScrollingClick} className="">
@@ -73,9 +70,17 @@ export class SidebarComponent extends Component<SidebarComponentProps> {
           <Button onClick={() => {}}>
             <User size={18} color="#ffffff" strokeWidth={2} />
           </Button>
-          <Button onClick={() => this.setState({ voicesOpen: true })}>
-            <AudioLines size={18} color="#ffffff" strokeWidth={2} />
-          </Button>
+          <div class="relative">
+            <Button onClick={() => this.setState({ menuOpen: !this.state.menuOpen })}>
+              <AudioLines size={18} color="#ffffff" strokeWidth={2} />
+            </Button>
+            <VoicePickerMenu
+              open={this.state.menuOpen}
+              onClose={() => this.setState({ menuOpen: false })}
+              onOpenSettings={onOpenSettings ?? (() => {})}
+              onProfileChanged={onProfileChanged}
+            />
+          </div>
         </div>
         {!autoScrolling && isPlaying && autoScrollingDirection === "down" && (
           <div class="absolute -bottom-[48px] bg-neutral-900 rounded-full mt-2 ring-sky-300 glow w-[40px] h-[40px] flex items-center justify-center animate-bottom-slide-in z-0">

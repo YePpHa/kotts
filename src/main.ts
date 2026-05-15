@@ -2,7 +2,7 @@ import { FanFictionTextExtractor } from "./extractors/FanFictionTextExtractor";
 import { RoyalRoadTextExtractor } from "./extractors/RoyalRoadTextExtractor";
 import { ScribbleHubTextExtractor } from "./extractors/ScribbleHubTextExtractor";
 import { BufferingState, PlaybackState } from "./libs/MediaController";
-import { createTTSApiService } from "./services/tts/createTTSApiService";
+import { createTTSApiService } from "./services/tts/backends";
 import { TTSService } from "./services/TTSService";
 import type { VoiceProfile } from "./services/VoiceProfilesService";
 import { VoiceProfilesService } from "./services/VoiceProfilesService";

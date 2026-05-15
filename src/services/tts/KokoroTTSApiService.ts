@@ -14,6 +14,7 @@ export type KokoroTTSApiServiceOptions = {
   voice: string;
   speed: number;
   langCode?: string;
+  authorization?: string;
 };
 
 const WordTimestampSchema = z.object({
@@ -69,13 +70,18 @@ const KokoroModelsResponseSchema = z.union([
 async function fetchFirstOkJson(
   apiURL: string,
   paths: string[],
-  options: Partial<TTSOptions> = {},
+  options: Partial<TTSOptions> & { authorization?: string } = {},
 ): Promise<unknown> {
+  const headers: Record<string, string> = {};
+  if (options.authorization) {
+    headers["Authorization"] = options.authorization;
+  }
   let lastError: unknown = null;
   for (const path of paths) {
     try {
       const response = await fetch(new URL(path, apiURL), {
         method: "GET",
+        headers,
         signal: options.signal,
       });
       if (!response.ok) {
@@ -96,6 +102,7 @@ export class KokoroTTSApiService implements ITTSApiService {
   private _voice: string;
   private _speed: number;
   private _langCode?: string;
+  private _authorization?: string;
 
   constructor(options: Partial<KokoroTTSApiServiceOptions> = {}) {
     this._apiURL = options.apiURL ?? "http://127.0.0.1:8880";
@@ -103,11 +110,20 @@ export class KokoroTTSApiService implements ITTSApiService {
     this._voice = options.voice ?? "af_heart";
     this._speed = options.speed ?? 1.0;
     this._langCode = options.langCode;
+    this._authorization = options.authorization;
+  }
+
+  private _getHeaders(extra?: Record<string, string>): Record<string, string> {
+    const headers: Record<string, string> = { ...extra };
+    if (this._authorization) {
+      headers["Authorization"] = this._authorization;
+    }
+    return headers;
   }
 
   public static async getAvailableVoices(
     apiURL: string,
-    options: Partial<TTSOptions> = {},
+    options: Partial<TTSOptions> & { authorization?: string } = {},
   ): Promise<string[]> {
     const raw = await fetchFirstOkJson(apiURL, ["/v1/audio/voices", "/dev/voices"], options);
 
@@ -131,7 +147,7 @@ export class KokoroTTSApiService implements ITTSApiService {
 
   public static async getAvailableModels(
     apiURL: string,
-    options: Partial<TTSOptions> = {},
+    options: Partial<TTSOptions> & { authorization?: string } = {},
   ): Promise<{ models: string[]; defaultModel: string | null }> {
     const raw = await fetchFirstOkJson(apiURL, ["/v1/models", "/dev/models"], options);
     const data = KokoroModelsResponseSchema.parse(raw);
@@ -173,13 +189,19 @@ export class KokoroTTSApiService implements ITTSApiService {
   }
 
   public async getAvailableVoices(options: Partial<TTSOptions> = {}): Promise<string[]> {
-    return KokoroTTSApiService.getAvailableVoices(this._apiURL, options);
+    return KokoroTTSApiService.getAvailableVoices(this._apiURL, {
+      ...options,
+      authorization: this._authorization,
+    });
   }
 
   public async getAvailableModels(
     options: Partial<TTSOptions> = {},
   ): Promise<{ models: string[]; defaultModel: string | null }> {
-    return KokoroTTSApiService.getAvailableModels(this._apiURL, options);
+    return KokoroTTSApiService.getAvailableModels(this._apiURL, {
+      ...options,
+      authorization: this._authorization,
+    });
   }
 
   public async createSpeech(text: string, options: Partial<TTSOptions> = {}): Promise<TTSResponse> {
@@ -187,9 +209,7 @@ export class KokoroTTSApiService implements ITTSApiService {
 
     const response = await fetch(`${this._apiURL}/dev/captioned_speech`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: this._getHeaders({ "Content-Type": "application/json" }),
       mode: "cors",
 
       body: JSON.stringify({
@@ -231,6 +251,7 @@ export class KokoroTTSApiService implements ITTSApiService {
     if (headers.has("X-Timestamps-Path")) {
       const response = await fetch(
         `${this._apiURL}/dev/timestamps/${headers.get("X-Timestamps-Path")}`,
+        { headers: this._getHeaders() },
       );
       return this._parseWordTimestamps(text, JSON.parse(await response.text()));
     }

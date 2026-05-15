@@ -30,5 +30,8 @@ export default defineConfig({
   lint: {
     options: { typeAware: true, typeCheck: true },
     plugins: ["unicorn", "typescript", "oxc"],
+    rules: {
+      curly: "error",
+    },
   },
 });

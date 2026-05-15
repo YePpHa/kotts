@@ -2,6 +2,7 @@ import { type Signal, signal } from "@preact/signals";
 import { render } from "preact";
 
 import type { VoiceProfile } from "../services/VoiceProfilesService";
+import { FullSettingsPopup } from "./components/FullSettingsPopup";
 import { SegmentHoverPlayButton } from "./components/SegmentHoverPlayButton";
 import { SidebarComponent } from "./components/SidebarComponent";
 import styleContent from "./style.css" with { type: "css" };
@@ -22,6 +23,7 @@ interface AppProps {
   segmentHoverIndex: Signal<number>;
   segmentHoverRange: Signal<Range | null>;
   hasActiveProfile: Signal<boolean>;
+  settingsOpen: Signal<boolean>;
   onPlayPauseClick: () => void;
   onSegmentHoverPlayClick: (index: number) => void;
   onEnableAutoScrollingClick: () => void;
@@ -31,6 +33,13 @@ interface AppProps {
 const App = (props: AppProps) => {
   return (
     <>
+      <FullSettingsPopup
+        open={props.settingsOpen.value}
+        onClose={() => {
+          props.settingsOpen.value = false;
+        }}
+        onProfileChanged={props.onProfileChanged}
+      />
       <SidebarComponent
         isPlaying={props.isPlaying.value}
         buffering={props.buffering.value}
@@ -42,6 +51,9 @@ const App = (props: AppProps) => {
         onPlayPauseClick={props.onPlayPauseClick}
         onEnableAutoScrollingClick={props.onEnableAutoScrollingClick}
         onProfileChanged={props.onProfileChanged}
+        onOpenSettings={() => {
+          props.settingsOpen.value = true;
+        }}
       />
       <SegmentHoverPlayButton
         onPlayClick={props.onSegmentHoverPlayClick}
@@ -84,6 +96,7 @@ export function setupUi(options: Options) {
   const segmentHoverIndexSignal = signal(options.segmentHoverIndex);
   const segmentHoverRangeSignal = signal(options.segmentHoverRange);
   const hasActiveProfileSignal = signal(options.hasActiveProfile);
+  const settingsOpenSignal = signal(false);
 
   render(
     <App
@@ -96,6 +109,7 @@ export function setupUi(options: Options) {
       segmentHoverIndex={segmentHoverIndexSignal}
       segmentHoverRange={segmentHoverRangeSignal}
       hasActiveProfile={hasActiveProfileSignal}
+      settingsOpen={settingsOpenSignal}
       onPlayPauseClick={options.onPlayPauseClick}
       onSegmentHoverPlayClick={options.onSegmentHoverPlayClick}
       onEnableAutoScrollingClick={options.onEnableAutoScrollingClick}
