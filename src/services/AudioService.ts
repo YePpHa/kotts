@@ -55,6 +55,9 @@ export class AudioService {
     try {
       for await (const chapter of this._audioReader.load(this.audio)) {
         this._chapters.push(chapter);
+        if (chapter.error) {
+          this.onError.emit(chapter.error);
+        }
         this.onSegmentLoad.emit();
       }
     } catch (err) {

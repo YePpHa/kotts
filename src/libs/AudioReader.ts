@@ -9,6 +9,7 @@ export type StreamData = {
 
 export interface StreamChapter {
   timeRange: IRange;
+  error?: unknown;
 }
 
 export class AudioReader {
@@ -35,8 +36,13 @@ export class AudioReader {
 
       reader.releaseLock();
 
+      let error: unknown;
       if (buffers.length > 0) {
-        await audio.next(type, concatBuffers(buffers));
+        try {
+          await audio.next(type, concatBuffers(buffers));
+        } catch (err) {
+          error = err;
+        }
       }
 
       const end = audio.duration;
@@ -46,6 +52,7 @@ export class AudioReader {
           start,
           end,
         },
+        error,
       };
     }
 
